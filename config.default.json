@@ -1,0 +1,103 @@
+{
+  "marca": {
+    "nombre": "Sonría Pues",
+    "eslogan": "¡Posa, sonríe y llévate el recuerdo!",
+    "colorPrimario": "#d6a545",
+    "colorSecundario": "#184659",
+    "colorFondo": "#fffdf8",
+    "tema": "claro",
+    "logo": "marca/logo.png",
+    "logoClaro": "marca/logo-claro.png",
+    "mostrarNombre": false,
+    "animacionCarga": true,
+    "marcaDeAgua": true
+  },
+  "textos": {},
+  "evento": {
+    "nombre": "Mi evento",
+    "textoImpresion": "¡Gracias por celebrar con nosotros!",
+    "fecha": "",
+    "mostrarFecha": true
+  },
+  "modos": {
+    "foto": true,
+    "gif": true,
+    "boomerang": true,
+    "video": true
+  },
+  "captura": {
+    "camaraId": "",
+    "resolucion": "1920x1080",
+    "cuentaPrimera": 5,
+    "cuentaRegresiva": 3,
+    "pausaEntreFotos": 1.5,
+    "espejoVistaPrevia": true,
+    "espejoFotos": false,
+    "flash": true,
+    "sonidos": true,
+    "voz": true,
+    "permitirRepetir": true
+  },
+  "plantillas": {
+    "habilitadas": ["tira-4", "postal-1", "cuadricula-4", "grande-3", "tira-3", "retrato-1"],
+    "porDefecto": "tira-4",
+    "fondo": "degradado",
+    "fondoImagen": "",
+    "marcoFotos": true,
+    "esquinasRedondeadas": true,
+    "fuente": "moderna"
+  },
+  "filtros": {
+    "mostrarSelector": true,
+    "habilitados": ["normal", "bn", "glamour", "sepia", "vintage", "calido", "frio", "vivido", "belleza"],
+    "porDefecto": "normal"
+  },
+  "stickers": {
+    "habilitados": true,
+    "frases": ["¡Salud! 🥂", "Los mejores", "#SonriaPues", "Te quiero", "¡Qué noche!"],
+    "emojis": [
+      "👑", "🎩", "🕶️", "🥸", "💋", "🎀", "🌹", "💐",
+      "❤️", "💖", "💍", "🥂", "🍾", "🎂", "🎉", "🎈",
+      "⭐", "✨", "🔥", "💯", "😎", "🥳", "😂", "😍",
+      "🦄", "🐶", "🐱", "🌈", "🎸", "🎤", "🤠", "👸"
+    ]
+  },
+  "gif": {
+    "fotos": 4,
+    "retrasoMs": 450,
+    "ancho": 720,
+    "tambienEnModoFoto": true
+  },
+  "boomerang": {
+    "segundos": 2,
+    "fps": 12,
+    "ancho": 640
+  },
+  "video": {
+    "segundos": 10,
+    "conAudio": true
+  },
+  "impresion": {
+    "habilitada": true,
+    "copiasMaximas": 3,
+    "copiasPorDefecto": 1
+  },
+  "compartir": {
+    "qr": true,
+    "urlBase": "",
+    "nube": {
+      "activo": false,
+      "servicio": "cloudinary",
+      "cloudName": "",
+      "preset": "",
+      "subirFotosSueltas": false,
+      "urlGaleria": ""
+    }
+  },
+  "general": {
+    "pin": "1234",
+    "inactividadSegundos": 45,
+    "pantallaFinalSegundos": 60,
+    "mostrarRecientes": true
+  }
+}

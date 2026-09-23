@@ -1,0 +1,11 @@
+# Fotos de los eventos, ajustes y logos subidos: NUNCA se publican
+datos/
+
+# Node.js incluido en la carpeta (90 MB): quien descargue el repositorio instala Node
+node/
+
+# basura del sistema
+Thumbs.db
+desktop.ini
+.DS_Store
+*.log

@@ -1,0 +1,13 @@
+{
+  "name": "sonria-pjs",
+  "version": "1.0.0",
+  "description": "Sonría PJs - cabina de fotos para eventos (fotos, GIF, boomerang y video)",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sonría Pues · Tus fotos</title>
+<meta name="theme-color" content="#fffdf8">
+<link rel="icon" href="../public/marca/icono.png" type="image/png">
+<style>
+  :root { --primario: #d6a545; --secundario: #184659; --fondo: #fffdf8; --texto: #2e2821; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    color: var(--texto);
+    background: radial-gradient(120% 60% at 50% 0%, color-mix(in srgb, var(--primario) 18%, var(--fondo)) 0%, var(--fondo) 70%) fixed;
+  }
+  header { text-align: center; padding: 26px 16px 6px; }
+  header img { max-height: 130px; max-width: 78%; }
+  header p { margin: 8px 0 0; font-weight: 600; }
+  main { max-width: 720px; margin: 0 auto; padding: 16px; display: grid; gap: 18px; }
+  figure {
+    margin: 0;
+    padding: 12px;
+    background: #fff;
+    border: 1px solid rgba(46, 40, 33, 0.1);
+    border-radius: 18px;
+    box-shadow: 0 10px 30px rgba(60, 45, 20, 0.12);
+  }
+  figure img, figure video { width: 100%; display: block; border-radius: 10px; background: #000; }
+  .boton {
+    display: block;
+    margin-top: 12px;
+    padding: 14px;
+    border-radius: 999px;
+    text-align: center;
+    font-weight: 700;
+    color: #fff;
+    text-decoration: none;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--secundario) 85%, #fff), var(--secundario));
+  }
+  .ayuda { text-align: center; font-size: 14px; opacity: .72; padding: 4px 16px 36px; }
+  .vacio { text-align: center; padding: 40px 20px; }
+</style>
+</head>
+<body>
+<header>
+  <img src="../public/marca/logo.png" alt="Sonría Pues Photobooth">
+  <p id="evento"></p>
+</header>
+<main id="galeria"></main>
+<p class="ayuda">¿No se descarga? Mantén presionada la foto y elige “Guardar imagen”.</p>
+
+<script type="module">
+  import { leerEnlace, urlDeArchivo } from '../public/js/nube.js';
+
+  const galeria = document.getElementById('galeria');
+  const datos = leerEnlace(location.hash);
+
+  if (!datos?.a?.length) {
+    galeria.innerHTML = '<p class="vacio">No encontramos estas fotos.<br>Pide en la cabina que te muestren el código QR otra vez.</p>';
+  } else {
+    document.getElementById('evento').textContent = datos.e || '';
+    const etiquetas = { jpg: 'Descargar foto', png: 'Descargar foto', gif: 'Descargar GIF', mp4: 'Descargar video', webm: 'Descargar video' };
+    for (const archivo of datos.a) {
+      const url = urlDeArchivo(datos.c, archivo);
+      const descarga = urlDeArchivo(datos.c, archivo, true);
+      const figura = document.createElement('figure');
+      figura.innerHTML = archivo.tipo === 'v'
+        ? `<video src="${url}" controls playsinline loop muted autoplay preload="metadata"></video>`
+        : `<img src="${url}" alt="Tu recuerdo" loading="lazy">`;
+      const boton = document.createElement('a');
+      boton.className = 'boton';
+      boton.href = descarga;
+      boton.textContent = etiquetas[archivo.formato] || 'Descargar';
+      figura.append(boton);
+      galeria.append(figura);
+    }
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sonría Pues</title>
+  <link rel="icon" href="marca/icono.png" type="image/png">
+  <link rel="stylesheet" href="css/app.css">
+  <style id="estilo-pagina-impresion"></style>
+  <!-- el tema se fija antes de pintar para que no parpadee (se confirma con los ajustes) -->
+  <script>document.documentElement.dataset.tema = 'claro';</script>
+</head>
+<body>
+  <!-- animación de carga al abrir el programa -->
+  <div class="carga" id="carga" aria-hidden="true">
+    <video class="video-marca" id="video-carga" src="marca/carga.mp4" muted playsinline preload="auto"></video>
+  </div>
+
+  <!-- fondo animado compartido por todas las pantallas -->
+  <div class="fondo-animado" aria-hidden="true">
+    <span class="mancha m1"></span><span class="mancha m2"></span><span class="mancha m3"></span>
+  </div>
+
+  <!-- ============================================================ INICIO -->
+  <section class="pantalla" id="p-inicio" data-pantalla="inicio">
+    <div class="inicio-contenido">
+      <div class="inicio-texto">
+        <img class="marca-logo" alt="" hidden>
+        <h1 class="marca-nombre">Sonría PJs</h1>
+        <p class="evento-nombre"></p>
+        <p class="marca-eslogan"></p>
+        <button class="boton-gigante pulso" id="btn-comenzar" data-texto="inicioBoton">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3 7.2 5H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.2L15 3H9zm3 5a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
+          Toca para comenzar
+        </button>
+      </div>
+      <div class="inicio-recientes" id="recientes" aria-hidden="true"></div>
+    </div>
+    <button class="boton-ajustes" id="btn-ajustes" aria-label="Ajustes">
+      <svg viewBox="0 0 24 24"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.6 7.6 0 0 0-1.7-1L15 3.3h-4l-.4 2.6c-.6.3-1.2.6-1.7 1l-2.5-1-2 3.5L6.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1l.4 2.6h4l.4-2.6c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5-2.1-1.6zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></svg>
+    </button>
+    <p class="aviso-camara" id="aviso-camara" hidden></p>
+  </section>
+
+  <!-- ============================================================ MODO -->
+  <section class="pantalla" id="p-modo" data-pantalla="modo">
+    <header class="encabezado">
+      <button class="boton-volver" data-accion="inicio" aria-label="Volver">‹</button>
+      <h2 data-texto="modoTitulo">¿Qué quieres crear?</h2>
+    </header>
+    <div class="opciones-modo" id="opciones-modo"></div>
+  </section>
+
+  <!-- ============================================================ PLANTILLA -->
+  <section class="pantalla" id="p-plantilla" data-pantalla="plantilla">
+    <header class="encabezado">
+      <button class="boton-volver" data-accion="atras" aria-label="Volver">‹</button>
+      <h2 data-texto="plantillaTitulo">Elige tu diseño</h2>
+    </header>
+    <div class="opciones-plantilla" id="opciones-plantilla"></div>
+  </section>
+
+  <!-- ============================================================ FILTRO -->
+  <section class="pantalla" id="p-filtro" data-pantalla="filtro">
+    <header class="encabezado">
+      <button class="boton-volver" data-accion="atras" aria-label="Volver">‹</button>
+      <h2 data-texto="filtroTitulo">Elige un estilo</h2>
+    </header>
+    <div class="filtro-cuerpo">
+      <div class="filtro-principal">
+        <video class="video-vivo espejo" id="video-filtro" muted playsinline autoplay></video>
+      </div>
+      <div class="opciones-filtro" id="opciones-filtro"></div>
+    </div>
+    <div class="barra-acciones">
+      <button class="boton-gigante" id="btn-filtro-listo" data-texto="filtroBoton">¡Listo, a posar!</button>
+    </div>
+  </section>
+
+  <!-- ============================================================ CAPTURA -->
+  <section class="pantalla pantalla-captura" id="p-captura" data-pantalla="captura">
+    <video class="video-vivo espejo" id="video-principal" muted playsinline autoplay></video>
+    <div class="captura-indicador" id="captura-indicador"></div>
+    <div class="cuenta" id="cuenta" aria-live="assertive"></div>
+    <div class="mensaje-grande" id="mensaje-captura"></div>
+    <div class="grabando" id="grabando" hidden>
+      <span class="punto-rojo"></span><span id="grabando-tiempo">0:10</span>
+      <button class="boton-secundario" id="btn-detener-video" data-texto="capturaDetener">Detener</button>
+    </div>
+    <img class="vista-disparo" id="vista-disparo" alt="">
+    <div class="miniaturas" id="miniaturas"></div>
+    <div class="flash" id="flash"></div>
+  </section>
+
+  <!-- ============================================================ REVISIÓN -->
+  <section class="pantalla" id="p-revision" data-pantalla="revision">
+    <header class="encabezado">
+      <h2 data-texto="revisionTitulo">¿Qué tal quedaron?</h2>
+      <p class="subtitulo" data-texto="revisionSubtitulo">Toca una foto para repetirla</p>
+    </header>
+    <div class="revision-fotos" id="revision-fotos"></div>
+    <div class="barra-acciones">
+      <button class="boton-secundario grande" id="btn-repetir-todo" data-texto="revisionRepetirTodas">↺ Repetir todas</button>
+      <button class="boton-gigante" id="btn-revision-listo" data-texto="revisionListo">¡Me encantan!</button>
+    </div>
+  </section>
+
+  <!-- ============================================================ STICKERS -->
+  <section class="pantalla" id="p-stickers" data-pantalla="stickers">
+    <header class="encabezado">
+      <h2 data-texto="stickersTitulo">Decora tu foto</h2>
+      <p class="subtitulo" data-texto="stickersSubtitulo">Toca un sticker para agregarlo, arrástralo y ajusta su tamaño</p>
+    </header>
+    <div class="stickers-cuerpo">
+      <div class="stickers-escenario" id="stickers-escenario">
+        <canvas id="stickers-lienzo"></canvas>
+        <div class="stickers-capa" id="stickers-capa"></div>
+      </div>
+      <aside class="stickers-panel">
+        <div class="stickers-paleta" id="stickers-paleta"></div>
+        <div class="stickers-herramientas" id="stickers-herramientas">
+          <button data-herramienta="menos" aria-label="Más pequeño">−</button>
+          <button data-herramienta="mas" aria-label="Más grande">+</button>
+          <button data-herramienta="izq" aria-label="Girar a la izquierda">⟲</button>
+          <button data-herramienta="der" aria-label="Girar a la derecha">⟳</button>
+          <button data-herramienta="quitar" aria-label="Quitar sticker">🗑</button>
+        </div>
+      </aside>
+    </div>
+    <div class="barra-acciones">
+      <button class="boton-secundario grande" id="btn-stickers-omitir" data-texto="stickersOmitir">Sin stickers</button>
+      <button class="boton-gigante" id="btn-stickers-listo" data-texto="stickersListo">¡Listo!</button>
+    </div>
+  </section>
+
+  <!-- ============================================================ PROCESANDO -->
+  <section class="pantalla" id="p-procesando" data-pantalla="procesando">
+    <div class="procesando">
+      <video class="video-marca procesando-video" id="video-procesando" src="marca/carga.mp4" muted loop playsinline preload="auto" hidden></video>
+      <div class="anillo" id="anillo-procesando"></div>
+      <h2 id="procesando-texto">Creando tu recuerdo…</h2>
+      <div class="barra-progreso"><span id="procesando-barra"></span></div>
+    </div>
+  </section>
+
+  <!-- ============================================================ FINAL -->
+  <section class="pantalla" id="p-final" data-pantalla="final">
+    <div class="final-cuerpo">
+      <div class="final-resultado" id="final-resultado"></div>
+      <aside class="final-panel">
+        <h2 data-texto="finalTitulo">¡Quedó increíble!</h2>
+        <div class="bloque-impresion" id="bloque-impresion">
+          <div class="copias">
+            <button class="boton-circulo" id="btn-copias-menos" aria-label="Menos copias">−</button>
+            <div><strong id="copias-numero">1</strong><span id="copias-etiqueta">copia</span></div>
+            <button class="boton-circulo" id="btn-copias-mas" aria-label="Más copias">+</button>
+          </div>
+          <button class="boton-gigante" id="btn-imprimir" data-texto="finalImprimir">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v4H7zM5 8h14a3 3 0 0 1 3 3v6h-4v4H6v-4H2v-6a3 3 0 0 1 3-3zm3 7v4h8v-4zm10-4.5a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/></svg>
+            Imprimir
+          </button>
+          <p class="tamano-impresion" id="tamano-impresion"></p>
+        </div>
+        <a class="boton-gigante" id="btn-descargar" data-texto="finalDescargar" download hidden>Descargar mi recuerdo</a>
+        <div class="bloque-qr" id="bloque-qr">
+          <div class="qr" id="qr"></div>
+          <p><span data-texto="finalQr">Escanea con tu celular para descargar</span><br><small data-texto="finalQrAyuda">(conéctate al Wi-Fi del evento)</small></p>
+        </div>
+        <button class="boton-secundario grande" id="btn-terminar" data-texto="finalTerminar">Terminar</button>
+        <p class="regreso" id="regreso"></p>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ============================================================ PIN -->
+  <div class="modal" id="modal-pin" hidden>
+    <div class="modal-caja pin-caja">
+      <h3>Ingresa el PIN</h3>
+      <div class="pin-puntos" id="pin-puntos"></div>
+      <div class="pin-teclado" id="pin-teclado"></div>
+      <button class="boton-secundario" id="btn-pin-cancelar">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- ============================================================ AJUSTES -->
+  <div class="ajustes" id="ajustes" hidden>
+    <div class="ajustes-ventana">
+      <header class="ajustes-encabezado">
+        <h2>Ajustes de la cabina</h2>
+        <div class="ajustes-botones">
+          <button class="boton-secundario" id="btn-ajustes-cancelar">Cancelar</button>
+          <button class="boton-primario" id="btn-ajustes-guardar">Guardar</button>
+        </div>
+      </header>
+      <div class="ajustes-cuerpo">
+        <nav class="ajustes-pestanas" id="ajustes-pestanas"></nav>
+        <div class="ajustes-contenido" id="ajustes-contenido"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="aviso-flotante" id="aviso-flotante" role="status" hidden></div>
+
+  <!-- área que sólo aparece al imprimir -->
+  <div id="area-impresion"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,60 @@
+# Sonría Pues Photobooth 📸
+
+Cabina de fotos para eventos: **tiras impresas, GIF, boomerang y video**, con descarga por
+**código QR** y diseños propios hechos en Photoshop o Canva.
+
+Funciona de dos maneras con el mismo código:
+
+| | Para PC (Windows) | En el navegador |
+|---|---|---|
+| Fotos, GIF, boomerang y video | ✅ | ✅ |
+| Filtros, stickers y diseños propios | ✅ | ✅ |
+| Impresión a la medida exacta del diseño | ✅ | ❌ |
+| Galería y fotos guardadas en la computadora | ✅ | ❌ (se descargan en el dispositivo) |
+| Código QR en la red del evento | ✅ | ❌ |
+| Código QR con datos móviles (subiendo a la nube) | ✅ | ✅ |
+
+👉 **Probar la cabina en el navegador:** <https://tesaludaw33.github.io/sonria-pues-photobooth/public/>
+
+---
+
+## Usarla en la computadora (Windows)
+
+1. Instala [Node.js](https://nodejs.org) (versión LTS) y descarga este repositorio.
+2. Doble clic en **`Configurar Sonria PJs.bat`** para preparar el evento (PIN inicial `1234`).
+3. Doble clic en **`Iniciar Sonria PJs.bat`** el día del evento: abre a pantalla completa
+   e imprime directo. Para salir, `Alt + F4`.
+
+Todo lo demás (textos, colores, plantillas, tiempos, impresión) se cambia desde los ajustes,
+sin tocar el código. Las instrucciones completas están en [LEEME.md](LEEME.md).
+
+## Descargas con datos móviles
+
+Para que el QR funcione fuera del Wi-Fi del evento, la cabina sube cada sesión a
+[Cloudinary](https://cloudinary.com) (plan gratuito, sin claves secretas) y el QR abre la
+página `g/` de este mismo sitio. Se configura en *Ajustes → Impresión y QR*.
+
+Sin internet, el QR vuelve solo a la dirección de la red local.
+
+## Qué hay en cada carpeta
+
+| Carpeta / archivo | Para qué sirve |
+|---|---|
+| `public/` | La cabina: pantallas, estilos y toda la lógica. Sirve igual en PC y en la web. |
+| `public/js/` | Módulos: `app.js` (flujo), `plantillas.js`, `disenos.js`, `camara.js`, `gif.js`, `qr.js`, `nube.js`, `textos.js`, `web.js`. |
+| `public/marca/` | Logotipo, icono y animación de la marca. |
+| `g/` | Página de descarga que abre el código QR. |
+| `server.js` | Servidor local (sólo versión PC): guarda las sesiones y publica la galería. |
+| `config.default.json` | Valores iniciales de toda la configuración. |
+| `datos/` | Fotos, ajustes y diseños del usuario. **No se sube al repositorio.** |
+
+## Hecho sin dependencias
+
+Todo es código propio y sin librerías externas: el codificador de **códigos QR**, el de
+**GIF animado**, el motor de plantillas, la detección automática de recuadros en los diseños
+y el servidor. Sólo necesita Node.js y un navegador basado en Chromium.
+
+## Licencia
+
+© 2026 Sonría Pues Photobooth. Todos los derechos reservados.
+Node.js se distribuye con su propia licencia MIT.
