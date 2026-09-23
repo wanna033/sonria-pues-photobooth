@@ -93,6 +93,7 @@ export const GRUPOS_TEXTOS = [
       ['finalQr', 'Texto del código QR', 'Escanea con tu celular para descargar'],
       ['finalQrAyuda', 'Ayuda debajo del QR (red local)', '(conéctate al Wi-Fi del evento)'],
       ['finalQrAyudaNube', 'Ayuda debajo del QR (por internet)', '(funciona con tus datos móviles)'],
+      ['finalQrAyudaPermanente', 'Ayuda debajo del QR (fotos guardadas en internet)', '(funciona siempre, también con datos móviles)'],
       ['finalDescargar', 'Botón descargar (versión web)', 'Descargar mi recuerdo'],
       ['finalTerminar', 'Botón terminar', 'Terminar'],
       ['finalRegreso', 'Cuenta para volver al inicio ({segundos})', 'Volviendo al inicio en {segundos} s'],

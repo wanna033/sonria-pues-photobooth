@@ -29,6 +29,20 @@
     box-shadow: 0 10px 30px rgba(60, 45, 20, 0.12);
   }
   figure img, figure video { width: 100%; display: block; border-radius: 10px; background: #000; }
+  figure img[hidden], figure video[hidden], .boton[hidden] { display: none; }
+  .subiendo {
+    display: grid;
+    place-items: center;
+    gap: 10px;
+    min-height: 220px;
+    padding: 24px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--primario) 10%, #fff);
+    text-align: center;
+  }
+  .subiendo[hidden] { display: none; }
+  .rueda { width: 42px; height: 42px; border-radius: 50%; border: 4px solid color-mix(in srgb, var(--primario) 30%, transparent); border-top-color: var(--primario); animation: girar 1s linear infinite; }
+  @keyframes girar { to { transform: rotate(1turn); } }
   .boton {
     display: block;
     margin-top: 12px;
@@ -56,27 +70,93 @@
   import { leerEnlace, urlDeArchivo } from '../public/js/nube.js';
 
   const galeria = document.getElementById('galeria');
-  const datos = leerEnlace(location.hash);
+  const etiquetas = { jpg: 'Descargar foto', png: 'Descargar foto', gif: 'Descargar GIF', mp4: 'Descargar video', webm: 'Descargar video' };
 
-  if (!datos?.a?.length) {
+  /**
+   * Enlace permanente de la cabina: ?c=<cuenta>&s=<sesión>&a=<archivos>
+   * Cada letra es un archivo: r = recuerdo, a = GIF, b = boomerang, v/w = video, 1-9 = fotos.
+   */
+  function leerEnlacePermanente() {
+    const p = new URLSearchParams(location.search);
+    const cuenta = p.get('c') || '';
+    const sesion = p.get('s') || '';
+    const codigos = p.get('a') || 'r';
+    if (!/^[a-z0-9_-]{1,80}$/i.test(cuenta) || !/^[0-9]{8}-[0-9]{6}-[0-9a-f]{6,16}$/.test(sesion)) return null;
+    const nombres = { r: ['recuerdo', 'jpg', 'image'], a: ['animacion', 'gif', 'image'], b: ['boomerang', 'gif', 'image'], v: ['video', 'mp4', 'video'], w: ['video', 'mp4', 'video'] };
+    const archivos = [];
+    for (const c of codigos) {
+      const [base, formato, tipo] = nombres[c] || (/^[1-9]$/.test(c) ? [`foto-${c}`, 'jpg', 'image'] : []);
+      if (!base) continue;
+      const ruta = `sonria/${sesion}/${base}.${formato}`;
+      archivos.push({
+        tipo,
+        formato,
+        url: `https://res.cloudinary.com/${cuenta}/${tipo}/upload/${ruta}`,
+        descarga: `https://res.cloudinary.com/${cuenta}/${tipo}/upload/fl_attachment/${ruta}`,
+      });
+    }
+    return archivos.length ? archivos : null;
+  }
+
+  /** Enlace de la versión web: #<datos> (archivos ya subidos desde el navegador). */
+  function leerEnlaceWeb() {
+    const datos = leerEnlace(location.hash);
+    if (!datos?.a?.length) return null;
+    document.getElementById('evento').textContent = datos.e || '';
+    return datos.a.map((a) => ({
+      tipo: a.tipo === 'v' ? 'video' : 'image',
+      formato: a.formato,
+      url: urlDeArchivo(datos.c, a),
+      descarga: urlDeArchivo(datos.c, a, true),
+    }));
+  }
+
+  /** Muestra el archivo; si todavía se está subiendo, avisa y reintenta solo. */
+  function mostrar(archivo) {
+    const figura = document.createElement('figure');
+    const espera = document.createElement('div');
+    espera.className = 'subiendo';
+    espera.hidden = true;
+    espera.innerHTML = '<div class="rueda"></div><strong>Tus fotos se están subiendo…</strong><span>En cuanto estén listas aparecen aquí solas. No cierres esta página.</span>';
+
+    const medio = document.createElement(archivo.tipo === 'video' ? 'video' : 'img');
+    if (archivo.tipo === 'video') Object.assign(medio, { controls: true, playsInline: true, loop: true, muted: true, autoplay: true, preload: 'metadata' });
+    else medio.alt = 'Tu recuerdo';
+
+    const boton = document.createElement('a');
+    boton.className = 'boton';
+    boton.href = archivo.descarga;
+    boton.textContent = etiquetas[archivo.formato] || 'Descargar';
+    boton.hidden = true;
+
+    let intento = 0;
+    const cargar = () => {
+      intento += 1;
+      medio.src = intento === 1 ? archivo.url : `${archivo.url}?intento=${intento}`;
+    };
+    const listo = () => {
+      espera.hidden = true;
+      medio.hidden = false;
+      boton.hidden = false;
+    };
+    const falta = () => {
+      medio.hidden = true;
+      espera.hidden = false;
+      setTimeout(cargar, 6000);
+    };
+    medio.addEventListener(archivo.tipo === 'video' ? 'loadeddata' : 'load', listo);
+    medio.addEventListener('error', falta);
+
+    figura.append(espera, medio, boton);
+    galeria.append(figura);
+    cargar();
+  }
+
+  const archivos = leerEnlacePermanente() || leerEnlaceWeb();
+  if (!archivos) {
     galeria.innerHTML = '<p class="vacio">No encontramos estas fotos.<br>Pide en la cabina que te muestren el código QR otra vez.</p>';
   } else {
-    document.getElementById('evento').textContent = datos.e || '';
-    const etiquetas = { jpg: 'Descargar foto', png: 'Descargar foto', gif: 'Descargar GIF', mp4: 'Descargar video', webm: 'Descargar video' };
-    for (const archivo of datos.a) {
-      const url = urlDeArchivo(datos.c, archivo);
-      const descarga = urlDeArchivo(datos.c, archivo, true);
-      const figura = document.createElement('figure');
-      figura.innerHTML = archivo.tipo === 'v'
-        ? `<video src="${url}" controls playsinline loop muted autoplay preload="metadata"></video>`
-        : `<img src="${url}" alt="Tu recuerdo" loading="lazy">`;
-      const boton = document.createElement('a');
-      boton.className = 'boton';
-      boton.href = descarga;
-      boton.textContent = etiquetas[archivo.formato] || 'Descargar';
-      figura.append(boton);
-      galeria.append(figura);
-    }
+    archivos.forEach(mostrar);
   }
 </script>
 </body>

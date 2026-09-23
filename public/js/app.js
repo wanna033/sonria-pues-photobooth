@@ -831,6 +831,21 @@ async function guardarSesion(archivos, principal, token) {
  */
 async function compartirEnInternet(archivos, token) {
   if (!nubeActiva(estado.config)) return;
+
+  // En la computadora la subida la hace el servidor (en segundo plano y con
+  // reintentos): aquí sólo se pide el enlace permanente, que ya sirve para el QR.
+  if (!MODO_WEB) {
+    if (!estado.sesion?.id) return;
+    try {
+      const r = await api(`/api/sesiones/${estado.sesion.id}/listo`, { method: 'POST', json: {} });
+      if (r.permanente && r.url) estado.sesion = { ...estado.sesion, url: r.url, enInternet: true, permanente: true };
+    } catch (err) {
+      console.error('No se pudo preparar el enlace permanente', err);
+    }
+    return;
+  }
+
+  // Versión web (sin servidor): se sube desde el navegador y se espera
   const texto = t('procesandoSubiendo');
   try {
     progreso(texto, 0.05);
@@ -937,7 +952,9 @@ function mostrarFinal() {
   $('#bloque-qr').hidden = !mostrarQr;
   $('#qr').innerHTML = mostrarQr ? qrSvg(sesion.url, { nivel: 'M' }) : '';
   // el aviso cambia según sea un enlace de internet o de la red del evento
-  $('[data-texto="finalQrAyuda"]').textContent = sesion?.enInternet ? t('finalQrAyudaNube') : t('finalQrAyuda');
+  $('[data-texto="finalQrAyuda"]').textContent = sesion?.permanente
+    ? t('finalQrAyudaPermanente')
+    : (sesion?.enInternet ? t('finalQrAyudaNube') : t('finalQrAyuda'));
 
   estado.finHasta = Date.now() + config.general.pantallaFinalSegundos * 1000;
   exito();

@@ -115,12 +115,12 @@ const SECCIONES = [
       { tipo: 'tunel' },
       { ruta: 'compartir.urlBase', tipo: 'texto', etiqueta: 'Dirección en el Wi-Fi del evento', ayuda: 'Déjala vacía para detectarla sola. Se usa cuando no hay enlace por internet.', marcador: 'red' },
       { tipo: 'red' },
-      { h: 'Opcional: guardar las fotos en la nube (Cloudinary)' },
+      { h: 'Guardar las fotos en internet (QR que funcionan siempre)' },
       { tipo: 'ayuda-nube' },
-      { ruta: 'compartir.nube.activo', tipo: 'bool', etiqueta: 'Subir cada sesión a internet', ayuda: 'Si no hay internet en el evento, el QR vuelve solo a la red local.' },
+      { ruta: 'compartir.nube.activo', tipo: 'bool', etiqueta: 'Guardar cada sesión en internet', ayuda: 'El QR usará un enlace permanente. Las sesiones anteriores se suben desde la pestaña Galería.' },
       { ruta: 'compartir.nube.cloudName', tipo: 'texto', etiqueta: 'Cloud name de Cloudinary', ayuda: 'Aparece arriba en el panel de Cloudinary. No es una clave secreta.' },
       { ruta: 'compartir.nube.preset', tipo: 'texto', etiqueta: 'Upload preset (Unsigned)', ayuda: 'El nombre del preset sin firmar que creaste en Cloudinary.' },
-      { ruta: 'compartir.nube.urlGaleria', tipo: 'texto', etiqueta: 'Dirección de tu página de descarga', ayuda: 'Por ejemplo https://tuusuario.github.io/sonria-pues/g. Si la dejas vacía, el QR abre la foto directamente.' },
+      { ruta: 'compartir.nube.urlGaleria', tipo: 'texto', etiqueta: 'Dirección de tu página de descarga', ayuda: 'Tu página en GitHub, por ejemplo https://wanna033.github.io/sonria-pues-photobooth/g. Si la dejas vacía, el QR abre la foto directamente.' },
       { ruta: 'compartir.nube.subirFotosSueltas', tipo: 'bool', etiqueta: 'Subir también las fotos individuales', ayuda: 'Apagado sube sólo la tira, el GIF y el video: más rápido y códigos QR más sencillos.' },
       { tipo: 'accion', etiqueta: 'Prueba', boton: '☁️ Probar la conexión con la nube', accion: 'probarNube' },
     ],
@@ -368,14 +368,16 @@ export class Ajustes {
     if (campo.h) return el('h3', {}, campo.h);
     if (campo.tipo === 'ayuda-nube') {
       return el('p', { class: 'nota' },
-        'Para que el QR se abra con datos móviles, la cabina sube cada sesión a ',
-        el('strong', {}, 'Cloudinary'), ' (plan gratuito). Una sola vez: ',
-        el('br'), '1. Crea tu cuenta en cloudinary.com y copia tu ', el('code', {}, 'Cloud name'), '.',
-        el('br'), '2. En Settings → Upload → Upload presets, crea uno con Signing Mode en ',
-        el('code', {}, 'Unsigned'), ' y copia su nombre.',
-        el('br'), '3. Pega los dos datos aquí abajo y pulsa "Probar la conexión".',
-        el('br'), 'Ninguno de los dos es una clave secreta. Ten en cuenta que las fotos quedan en internet: ',
-        'cualquiera con el enlace puede verlas.');
+        'Para que los QR funcionen ', el('strong', {}, 'siempre'),
+        ' (también días después y con la computadora apagada), cada sesión se guarda en ',
+        el('strong', {}, 'Cloudinary'), ' (plan gratuito). El QR sale al instante y las fotos se suben solas; ',
+        'si no hay internet en el evento, se suben en cuanto vuelva. Una sola vez:',
+        el('br'), '1. Crea tu cuenta en cloudinary.com y copia tu ', el('code', {}, 'Cloud name'), ' (aparece en el panel).',
+        el('br'), '2. En Settings → Upload → Upload presets → Add upload preset, pon Signing Mode en ',
+        el('code', {}, 'Unsigned'), ', guarda y copia su nombre.',
+        el('br'), '3. Pega los dos datos aquí abajo, activa la opción y pulsa "Probar la conexión".',
+        el('br'), 'Ninguno de los dos es una clave secreta. Las fotos quedan en internet: ',
+        'cualquiera con el enlace de una sesión puede verla, pero nadie puede ver la lista de todas.');
     }
     if (campo.tipo === 'tunel') {
       const estado = this.red?.tunel?.estado;
@@ -533,8 +535,13 @@ export class Ajustes {
       },
       el('option', { value: 'evento', selected: !todos }, 'Sólo este evento'),
       el('option', { value: 'todos', selected: todos }, 'Todos los eventos'))));
+    // fotos guardadas en internet: QR que funcionan siempre
+    const cajaNube = el('div', { class: 'nota' });
+    c.append(cajaNube);
+    this.pintarEstadoNube(cajaNube);
+
     c.append(el('h3', {}, todos ? 'Sesiones de todos los eventos' : `Sesiones de “${this.borrador.evento.nombre}”`));
-    c.append(el('p', { class: 'nota' }, 'Toca una sesión para verla en grande con su código QR, para que el invitado la descargue en su celular.'));
+    c.append(el('p', { class: 'nota' }, 'Toca una sesión para verla en grande con su código QR, para que el invitado la descargue en su celular. ☁️ = guardada en internet (su QR funciona siempre) · ⏳ = subiendo.'));
     const galeria = el('div', { class: 'galeria' });
     c.append(galeria);
 
@@ -564,7 +571,7 @@ export class Ajustes {
               ? el('img', { src: `/m/${s.id}/${s.principal}`, alt: '', loading: 'lazy' })
               : el('div', { class: 'sin-vista' }, '🎬')),
           el('figcaption', {},
-            el('span', {}, `${hora} · ${s.modo}${s.impresiones ? ` · 🖨️${s.impresiones}` : ''}`),
+            el('span', {}, `${s.nube === 'guardada' ? '☁️ ' : s.nube === 'pendiente' ? '⏳ ' : ''}${hora} · ${s.modo}${s.impresiones ? ` · 🖨️${s.impresiones}` : ''}`),
             el('button', { onclick: abrir }, '📱 QR'),
             s.archivos.includes('recuerdo.jpg')
               ? el('button', { onclick: () => this.acciones.reimprimir?.(s) }, 'Imprimir')
@@ -583,12 +590,58 @@ export class Ajustes {
     }
   }
 
+  /** Resumen de las fotos guardadas en internet y botón para subir las sesiones anteriores. */
+  async pintarEstadoNube(caja) {
+    let estado;
+    try {
+      estado = await this.api('/api/nube/estado');
+    } catch {
+      return;
+    }
+    if (!estado.activa) {
+      caja.replaceChildren(
+        '💡 Para que los QR de la galería funcionen siempre (aunque la computadora esté apagada), ',
+        'activa "Guardar las fotos en internet" en la pestaña Impresión y QR.');
+      return;
+    }
+    const partes = [`☁️ ${estado.guardadas} guardadas en internet`];
+    if (estado.pendientes) partes.push(`⏳ ${estado.pendientes} subiendo`);
+    if (estado.sinSubir) partes.push(`${estado.sinSubir} sólo en esta computadora`);
+    caja.replaceChildren(
+      el('strong', {}, partes.join(' · ')),
+      estado.ultimoError ? el('span', {}, el('br'), `⚠️ Último problema al subir: ${estado.ultimoError}`) : null,
+      estado.sinSubir
+        ? el('div', { class: 'fila-botones', style: 'margin-top:10px' },
+          el('button', {
+            class: 'boton-primario',
+            type: 'button',
+            onclick: async () => {
+              try {
+                const r = await this.api('/api/nube/subir-anteriores', { method: 'POST', json: {} });
+                this.acciones.aviso?.(`☁️ Guardando en internet ${r.encoladas} sesiones. Sigue usando la cabina; se suben solas.`);
+                this.pintarEstadoNube(caja);
+              } catch (err) {
+                this.acciones.aviso?.(err.message);
+              }
+            },
+          }, `☁️ Guardar en internet las ${estado.sinSubir} sesiones anteriores`))
+        : null);
+  }
+
   /** Muestra una sesión ya tomada en grande, con su código QR para descargarla otra vez. */
-  verSesion(s) {
+  async verSesion(s) {
     this.raiz.querySelector('.visor-sesion')?.remove();
-    // el enlace por internet (si está activo) sirve con datos móviles; si no, el del Wi-Fi
-    const porInternet = Boolean(this.red?.urlPublica);
-    const url = `${this.red?.urlPublica || this.red?.urlBase || location.origin}/g/${s.id}`;
+    // 1) guardada en internet: enlace permanente (funciona siempre)
+    // 2) si no: el enlace de internet vigente AHORA (se consulta de nuevo, nunca uno viejo)
+    // 3) si no hay: el del Wi-Fi del evento
+    let red = this.red;
+    try {
+      red = await this.api('/api/red');
+      this.red = red;
+    } catch { /* se usa el último conocido */ }
+    const permanente = Boolean(s.enlace);
+    const porInternet = permanente || Boolean(red?.urlPublica);
+    const url = permanente ? s.enlace : `${red?.urlPublica || red?.urlBase || location.origin}/g/${s.id}`;
     const archivo = `/m/${s.id}/${s.principal}`;
     const medio = /\.(mp4|webm)$/.test(s.principal)
       ? el('video', { src: archivo, autoplay: true, loop: true, muted: true, playsinline: true, controls: true })
@@ -616,9 +669,11 @@ export class Ajustes {
       el('aside', { class: 'visor-panel' },
         el('h3', {}, 'Escanea para descargar'),
         qr,
-        el('p', { class: 'nota' }, porInternet
-          ? 'Abre la cámara del celular y apunta al código. Funciona con datos móviles o desde cualquier Wi-Fi.'
-          : 'Abre la cámara del celular y apunta al código. El celular debe estar en el mismo Wi-Fi que esta computadora.'),
+        el('p', { class: 'nota' }, permanente
+          ? '☁️ Guardada en internet: este código funciona siempre, con datos móviles o cualquier Wi-Fi, aunque la computadora esté apagada.'
+          : porInternet
+            ? 'Abre la cámara del celular y apunta al código. Funciona con datos móviles mientras esta aplicación esté abierta.'
+            : 'Abre la cámara del celular y apunta al código. El celular debe estar en el mismo Wi-Fi que esta computadora.'),
         el('code', { class: 'visor-url' }, url),
         el('p', { class: 'nota' }, detalle),
         el('div', { class: 'fila-botones' },

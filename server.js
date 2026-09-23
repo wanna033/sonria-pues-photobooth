@@ -355,6 +355,9 @@ function resumenSesion(id, { meta }) {
     principal: meta.principal,
     archivos: meta.archivos.map((a) => a.nombre),
     impresiones: meta.impresiones || 0,
+    // enlace permanente (fotos guardadas en internet) y estado de la subida
+    enlace: meta.enlace || '',
+    nube: meta.nube ? (meta.nube.completo ? 'guardada' : 'pendiente') : '',
   };
 }
 
@@ -423,6 +426,131 @@ async function borrarImagenesDeDiseno(id) {
     await fsp.unlink(path.join(DISENOS, `${id}.${ext}`)).catch(() => {});
   }
 }
+
+// ---------------------------------------------------------------- fotos guardadas en internet (Cloudinary)
+//
+// Cada sesión se sube a Cloudinary con nombres fijos (sonria/<sesión>/recuerdo.jpg…),
+// así el enlace permanente se conoce ANTES de subir y el QR sale al instante:
+//   https://<usuario>.github.io/<repo>/g/?c=<cuenta>&s=<sesión>&a=<archivos>
+// La subida la hace el servidor en una cola: si no hay internet, reintenta cada
+// minuto y las fotos aparecen en cuanto vuelve la conexión.
+
+/** Letra corta de cada archivo dentro del enlace (mantiene el QR pequeño). */
+const CODIGOS_NUBE = { 'recuerdo.jpg': 'r', 'animacion.gif': 'a', 'boomerang.gif': 'b', 'video.mp4': 'v', 'video.webm': 'w' };
+
+function nubeLista(config) {
+  const n = config.compartir.nube;
+  return Boolean(n.activo && n.cloudName && n.preset);
+}
+
+function codigoNube(nombre) {
+  return CODIGOS_NUBE[nombre] || (nombre.match(/^foto-([1-9])\.jpg$/) || [])[1] || '';
+}
+
+/** Qué archivos de la sesión se guardan en internet (sin las fotos sueltas, salvo que se pida). */
+function archivosParaNube(config, meta) {
+  return meta.archivos.map((a) => a.nombre).filter((n) =>
+    CODIGOS_NUBE[n] || (config.compartir.nube.subirFotosSueltas && /^foto-[1-9]\.jpg$/.test(n)));
+}
+
+function enlacePermanente(config, id, meta) {
+  const cuenta = meta.nube?.cloud || config.compartir.nube.cloudName;
+  const archivos = meta.nube?.archivos || archivosParaNube(config, meta);
+  if (!cuenta || !archivos.length) return '';
+  const pagina = String(config.compartir.nube.urlGaleria || '').trim().replace(/\/+$/, '');
+  if (!pagina) {
+    // sin página de descarga: el QR abre directo el recuerdo principal
+    const principal = archivos[0];
+    const tipo = /\.(mp4|webm)$/.test(principal) ? 'video' : 'image';
+    return `https://res.cloudinary.com/${cuenta}/${tipo}/upload/sonria/${id}/${principal}`;
+  }
+  return `${pagina}/?c=${encodeURIComponent(cuenta)}&s=${id}&a=${archivos.map(codigoNube).join('')}`;
+}
+
+async function subirArchivoANube(config, id, sesion, nombre) {
+  const { cloudName, preset } = config.compartir.nube;
+  const esVideo = /\.(mp4|webm)$/.test(nombre);
+  const datos = await fsp.readFile(path.join(sesion.dir, nombre));
+  const cuerpo = new FormData();
+  cuerpo.append('file', new Blob([datos]), nombre);
+  cuerpo.append('upload_preset', preset);
+  cuerpo.append('public_id', `sonria/${id}/${nombre.replace(/\.[^.]+$/, '')}`);
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/${esVideo ? 'video' : 'image'}/upload`, {
+    method: 'POST',
+    body: cuerpo,
+    signal: AbortSignal.timeout(180 * 1000),
+  });
+  const respuesta = await res.json().catch(() => ({}));
+  if (res.ok) return;
+  const mensaje = respuesta?.error?.message || `Cloudinary respondió ${res.status}`;
+  if (/already exists/i.test(mensaje)) return; // ya estaba subido
+  throw new Error(mensaje);
+}
+
+const colaNube = [];
+const estadoNube = { subiendo: false, ultimoError: '', ultimaSubida: '' };
+
+/** Marca la sesión para guardarla en internet y devuelve su enlace permanente. */
+function prepararEnNube(config, id, sesion) {
+  const meta = sesion.meta;
+  if (!meta.nube?.completo) {
+    meta.nube = {
+      cloud: meta.nube?.cloud || config.compartir.nube.cloudName,
+      archivos: meta.nube?.archivos || archivosParaNube(config, meta),
+      subidos: meta.nube?.subidos || [],
+      completo: false,
+      error: '',
+    };
+  }
+  meta.enlace = enlacePermanente(config, id, meta);
+  if (!meta.nube.completo && !colaNube.includes(id)) colaNube.push(id);
+  return meta.enlace;
+}
+
+async function procesarColaNube() {
+  if (estadoNube.subiendo) return;
+  estadoNube.subiendo = true;
+  try {
+    while (colaNube.length) {
+      const id = colaNube[0];
+      const sesion = sesiones.get(id);
+      const config = leerConfig();
+      if (!sesion || !nubeLista(config) || !sesion.meta.nube) {
+        colaNube.shift();
+        continue;
+      }
+      const nube = sesion.meta.nube;
+      try {
+        for (const nombre of nube.archivos) {
+          if (nube.subidos.includes(nombre)) continue;
+          await subirArchivoANube(config, id, sesion, nombre);
+          nube.subidos.push(nombre);
+          await guardarMeta(sesion);
+        }
+        nube.completo = true;
+        nube.error = '';
+        await guardarMeta(sesion);
+        colaNube.shift();
+        estadoNube.ultimoError = '';
+        estadoNube.ultimaSubida = new Date().toISOString();
+        log(`Sesión ${id} guardada en internet`);
+      } catch (err) {
+        nube.error = err.message;
+        estadoNube.ultimoError = err.message;
+        await guardarMeta(sesion).catch(() => {});
+        log(`No se pudo guardar ${id} en internet (${err.message}); se reintenta en 1 minuto`);
+        break;
+      }
+    }
+  } finally {
+    estadoNube.subiendo = false;
+  }
+}
+
+// reintento periódico (por ejemplo, cuando vuelve el internet)
+setInterval(() => {
+  if (colaNube.length) procesarColaNube();
+}, 60 * 1000);
 
 // ---------------------------------------------------------------- página de descarga
 
@@ -737,6 +865,37 @@ async function manejarApi(req, res, metodo, partes, url) {
     }
   }
 
+  if (recurso === 'nube') {
+    // estado de la subida a internet (para los ajustes)
+    if (metodo === 'GET' && id === 'estado') {
+      let guardadas = 0;
+      let pendientes = 0;
+      let sinSubir = 0;
+      for (const { meta } of sesiones.values()) {
+        if (meta.nube?.completo) guardadas++;
+        else if (meta.nube) pendientes++;
+        else sinSubir++;
+      }
+      return enviarJSON(res, 200, { activa: nubeLista(leerConfig()), guardadas, pendientes, sinSubir, ...estadoNube, enCola: colaNube.length });
+    }
+    // guardar en internet también las sesiones anteriores (todas las de todos los eventos)
+    if (metodo === 'POST' && id === 'subir-anteriores') {
+      const config = leerConfig();
+      if (!nubeLista(config)) return enviarError(res, 400, 'Primero configura Cloudinary en Impresión y QR');
+      let nuevas = 0;
+      const lista = [...sesiones.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)); // las más recientes primero
+      for (const [sid, sesion] of lista) {
+        if (sesion.meta.nube?.completo) continue;
+        prepararEnNube(config, sid, sesion);
+        await guardarMeta(sesion);
+        nuevas++;
+      }
+      procesarColaNube();
+      log(`Guardando en internet ${nuevas} sesiones anteriores`);
+      return enviarJSON(res, 200, { encoladas: nuevas });
+    }
+  }
+
   if (recurso === 'sesiones') {
     // listar sesiones (más recientes primero)
     if (metodo === 'GET' && !id) {
@@ -795,6 +954,17 @@ async function manejarApi(req, res, metodo, partes, url) {
       if (!sesion.meta.principal) sesion.meta.principal = extra;
       await guardarMeta(sesion);
       return enviarJSON(res, 200, { ok: true, bytes: datos.length });
+    }
+
+    // la cabina terminó de subir los archivos: si hay nube, se guarda en internet y
+    // se devuelve el enlace permanente para el QR
+    if (metodo === 'POST' && extra === 'listo') {
+      const config = leerConfig();
+      if (!nubeLista(config)) return enviarJSON(res, 200, { permanente: false });
+      const enlace = prepararEnNube(config, id, sesion);
+      await guardarMeta(sesion);
+      procesarColaNube();
+      return enviarJSON(res, 200, { permanente: Boolean(enlace), url: enlace });
     }
 
     // registrar impresiones
@@ -1010,6 +1180,12 @@ process.on('exit', cerrarTunel);
 // ---------------------------------------------------------------- arranque
 
 indexarSesiones();
+
+// sesiones que quedaron a medio subir la última vez: se retoman solas
+for (const [id, { meta }] of sesiones) {
+  if (meta.nube && !meta.nube.completo) colaNube.push(id);
+}
+if (colaNube.length) setTimeout(procesarColaNube, 5000);
 
 const alFallar = (res) => (err) => {
   log('Error:', err.message);
