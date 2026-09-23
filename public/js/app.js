@@ -814,7 +814,8 @@ async function guardarSesion(archivos, principal, token) {
       await api(`/api/sesiones/${sesion.id}/${nombre}`, { method: 'PUT', body: blob, headers: { 'Content-Type': blob.type } });
       progreso($('#procesando-texto').textContent, 0.85 + (0.15 * (n + 1)) / archivos.length);
     }
-    estado.sesion = sesion;
+    // "publica": el enlace sale por internet (funciona con datos móviles)
+    estado.sesion = { ...sesion, enInternet: Boolean(sesion.publica) };
   } catch (err) {
     if (err === CANCELADO) throw err;
     console.error(err);

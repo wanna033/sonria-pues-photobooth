@@ -111,11 +111,30 @@ Y si quieres meterte en el código:
 | Colores y estilos de las pantallas | `public\css\app.css` |
 | Valores iniciales de toda la configuración | `config.default.json` |
 
-## Que el QR funcione con datos móviles
+## QR con datos móviles o desde cualquier Wi-Fi (automático)
 
-Por defecto el código QR sólo abre desde el Wi-Fi del evento. Para que funcione desde
-**cualquier red o con datos móviles**, la cabina sube cada sesión a **Cloudinary** (plan
-gratuito) y el QR abre tu página de descarga publicada en GitHub Pages.
+**No hay que configurar nada.** Al abrir la cabina se abre solo un enlace público y seguro
+de Cloudflare (`https://…trycloudflare.com`, gratis y sin cuenta), y el código QR de cada
+sesión usa ese enlace. Los invitados descargan sus fotos **con sus datos móviles o desde
+cualquier Wi-Fi**. En la pantalla final el QR dice "(funciona con tus datos móviles)".
+
+- Por ese enlace **sólo** se ven las fotos de cada sesión: los ajustes, la galería y la
+  cabina quedan cerrados. Cada sesión tiene un código largo imposible de adivinar.
+- La computadora de la cabina necesita internet (el Wi-Fi del lugar, un módem o los datos
+  del celular compartidos). Si no hay, el QR usa solo el Wi-Fi del evento y el enlace se
+  reabre en cuanto vuelve la conexión.
+- El enlace cambia cada vez que abres el programa; los QR se generan en el momento, así que
+  no importa. Las fotos se descargan de la computadora: deben estar encendida y conectada.
+- Su estado se ve en *Ajustes → Impresión y QR*, donde también se puede apagar.
+- Usa el programa `herramientas\cloudflared.exe`. Si falta (por ejemplo, si descargaste el
+  proyecto de GitHub), doble clic en **`Activar QR por internet.bat`** una sola vez.
+
+## Opcional: guardar las fotos en la nube (Cloudinary)
+
+Con el enlace automático, las fotos se descargan de la computadora mientras está encendida.
+Si quieres que los enlaces sigan funcionando **después del evento, con la computadora
+apagada**, la cabina puede subir cada sesión a **Cloudinary** (plan gratuito). En ese caso
+el QR abre tu página de descarga publicada en GitHub Pages.
 
 Se configura una sola vez, en *Ajustes → Impresión y QR*:
 

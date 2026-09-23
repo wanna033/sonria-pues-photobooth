@@ -84,6 +84,7 @@
   },
   "compartir": {
     "qr": true,
+    "internet": true,
     "urlBase": "",
     "nube": {
       "activo": false,

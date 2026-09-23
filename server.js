@@ -19,7 +19,8 @@ const fsp = fs.promises;
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
+const { pipeline } = require('stream');
 
 const PUERTO = Number(process.env.PUERTO || 5050);
 const RAIZ = __dirname;
@@ -33,7 +34,12 @@ const ARCHIVO_CONFIG = path.join(DATOS, 'config.json');
 const CONFIG_BASE = JSON.parse(fs.readFileSync(path.join(RAIZ, 'config.default.json'), 'utf8'));
 
 const MB = 1024 * 1024;
-const ID_VALIDO = /^[0-9]{8}-[0-9]{6}-[0-9a-f]{6}$/;
+// fecha-hora-aleatorio; las sesiones nuevas llevan 12 caracteres aleatorios porque
+// con el enlace por internet cualquiera podría intentar adivinarlas
+const ID_VALIDO = /^[0-9]{8}-[0-9]{6}-[0-9a-f]{6,16}$/;
+/** Puerto interno que sólo sirve las fotos; es el único que se publica en internet. */
+const PUERTO_PUBLICO = PUERTO + 1;
+const HERRAMIENTAS = path.join(RAIZ, 'herramientas');
 const ARCHIVO_VALIDO = /^[a-z0-9_-]{1,40}\.(jpg|png|gif|webm|mp4)$/;
 const RECURSO_VALIDO = /^(logo|logo-claro|fondo)\.(png|jpg|webp)$/;
 const ID_DISENO = /^[a-z0-9][a-z0-9-]{2,70}$/;
@@ -141,7 +147,7 @@ function nuevoId() {
   const p = (n) => String(n).padStart(2, '0');
   const fecha = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}`;
   const hora = `${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
-  return `${fecha}-${hora}-${crypto.randomBytes(3).toString('hex')}`;
+  return `${fecha}-${hora}-${crypto.randomBytes(6).toString('hex')}`;
 }
 
 function ipsLocales() {
@@ -163,7 +169,15 @@ function urlBase(config) {
   return `http://${ip}:${PUERTO}`;
 }
 
+/** Dirección que va en el QR: la de internet si el túnel está activo; si no, la de la red local. */
+function urlDescarga(config) {
+  if (config.compartir.internet !== false && tunel.url) return tunel.url;
+  return urlBase(config);
+}
+
 function esLocal(req) {
+  // lo que llega por un túnel o proxy nunca cuenta como "esta computadora"
+  if (req.headers['cf-connecting-ip'] || req.headers['cdn-loop'] || req.headers['x-forwarded-for']) return false;
   const ip = req.socket.remoteAddress || '';
   return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
 }
@@ -208,6 +222,23 @@ async function leerJSON(req) {
   }
 }
 
+/**
+ * Mueve una carpeta o archivo. En Windows, el antivirus o una descarga en curso
+ * pueden bloquearlo unos instantes: se reintenta antes de rendirse.
+ */
+async function moverConReintentos(origen, destino, intentos = 8) {
+  for (let n = 1; ; n++) {
+    try {
+      return await fsp.rename(origen, destino);
+    } catch (err) {
+      if (!['EPERM', 'EBUSY', 'EACCES'].includes(err.code) || n >= intentos) {
+        throw Object.assign(new Error('Un archivo de la sesión está en uso (quizá alguien lo está descargando). Intenta de nuevo en unos segundos.'), { codigo: 409 });
+      }
+      await new Promise((r) => setTimeout(r, 400 * n));
+    }
+  }
+}
+
 async function escribirAtomico(destino, datos) {
   const temporal = `${destino}.${process.pid}.tmp`;
   await fsp.writeFile(temporal, datos);
@@ -246,11 +277,19 @@ async function enviarArchivo(req, res, ruta, extraCabeceras = {}) {
       'Content-Length': fin - inicio + 1,
     });
     if (req.method === 'HEAD') return res.end();
-    return fs.createReadStream(ruta, { start: inicio, end: fin }).pipe(res);
+    return enviarFlujo(fs.createReadStream(ruta, { start: inicio, end: fin }), res);
   }
   res.writeHead(200, { ...cabeceras, 'Content-Length': info.size });
   if (req.method === 'HEAD') return res.end();
-  fs.createReadStream(ruta).pipe(res);
+  enviarFlujo(fs.createReadStream(ruta), res);
+}
+
+/**
+ * Envía el archivo y lo suelta siempre, aunque el celular se desconecte a la
+ * mitad (con .pipe() el archivo quedaba abierto y Windows no dejaba moverlo).
+ */
+function enviarFlujo(flujo, res) {
+  pipeline(flujo, res, () => {}); // el error de "cliente desconectado" no importa
 }
 
 // ---------------------------------------------------------------- sesiones
@@ -260,6 +299,9 @@ const sesiones = new Map();
 
 /** Último estado de la cámara reportado por la cabina. */
 let estadoCamara = null;
+
+/** Estado del enlace por internet (túnel de Cloudflare). */
+const tunel = { url: '', estado: 'apagado', detalle: '', proceso: null, intentos: 0, cerrando: false };
 
 function indexarSesiones() {
   sesiones.clear();
@@ -446,41 +488,63 @@ function paginaNoEncontrada(config) {
 
 // ---------------------------------------------------------------- rutas
 
-async function manejar(req, res) {
+function leerRuta(req) {
   const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const ruta = decodeURIComponent(url.pathname);
-  const metodo = req.method;
-  const partes = ruta.split('/').filter(Boolean);
+  return { url, ruta, metodo: req.method, partes: ruta.split('/').filter(Boolean) };
+}
 
-  // ---- rutas públicas (invitados en la red Wi-Fi)
+/**
+ * Rutas públicas: la página de descarga de cada sesión, sus archivos y la marca.
+ * Es lo único que ven los invitados (en el Wi-Fi o por internet).
+ * @returns {boolean} true si la petición era pública y ya se respondió
+ */
+function manejarPublico(req, res, { url, metodo, partes }) {
+  const lectura = metodo === 'GET' || metodo === 'HEAD';
 
   if (metodo === 'GET' && partes[0] === 'g' && partes.length === 2) {
     const config = leerConfig();
     const sesion = ID_VALIDO.test(partes[1]) && sesiones.get(partes[1]);
     res.writeHead(sesion ? 200 : 404, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-    return res.end(sesion ? paginaGaleria(config, partes[1], sesion) : paginaNoEncontrada(config));
+    res.end(sesion ? paginaGaleria(config, partes[1], sesion) : paginaNoEncontrada(config));
+    return true;
   }
 
-  if ((metodo === 'GET' || metodo === 'HEAD') && partes[0] === 'm' && partes.length === 3) {
+  if (lectura && partes[0] === 'm' && partes.length === 3) {
     const [, id, archivo] = partes;
     const sesion = ID_VALIDO.test(id) && ARCHIVO_VALIDO.test(archivo) && sesiones.get(id);
-    if (!sesion) return enviarError(res, 404, 'No encontrado');
+    if (!sesion) {
+      enviarError(res, 404, 'No encontrado');
+      return true;
+    }
     const extra = url.searchParams.has('descargar')
       ? { 'Content-Disposition': `attachment; filename="${slug(leerConfig().marca.nombre)}-${archivo}"` }
       : {};
-    return enviarArchivo(req, res, path.join(sesion.dir, archivo), extra);
+    enviarArchivo(req, res, path.join(sesion.dir, archivo), extra);
+    return true;
   }
 
-  if ((metodo === 'GET' || metodo === 'HEAD') && partes[0] === 'recursos' && partes.length === 2) {
-    if (!RECURSO_VALIDO.test(partes[1])) return enviarError(res, 404, 'No encontrado');
-    return enviarArchivo(req, res, path.join(RECURSOS, partes[1]));
+  if (lectura && partes[0] === 'recursos' && partes.length === 2) {
+    if (RECURSO_VALIDO.test(partes[1])) enviarArchivo(req, res, path.join(RECURSOS, partes[1]));
+    else enviarError(res, 404, 'No encontrado');
+    return true;
   }
 
   // logotipo, icono y animación de la marca (también los ve el celular del invitado)
-  if ((metodo === 'GET' || metodo === 'HEAD') && partes[0] === 'marca' && partes.length === 2) {
-    if (!/^[a-z0-9_-]{1,60}\.(png|jpg|webp|svg|mp4|webm)$/.test(partes[1])) return enviarError(res, 404, 'No encontrado');
-    return enviarArchivo(req, res, path.join(PUBLICO, 'marca', partes[1]));
+  if (lectura && partes[0] === 'marca' && partes.length === 2) {
+    if (/^[a-z0-9_-]{1,60}\.(png|jpg|webp|svg|mp4|webm)$/.test(partes[1])) enviarArchivo(req, res, path.join(PUBLICO, 'marca', partes[1]));
+    else enviarError(res, 404, 'No encontrado');
+    return true;
   }
+
+  return false;
+}
+
+/** Servidor principal (puerto 5050): la cabina completa, sólo desde esta computadora. */
+async function manejar(req, res) {
+  const peticion = leerRuta(req);
+  if (manejarPublico(req, res, peticion)) return;
+  const { url, ruta, metodo, partes } = peticion;
 
   // ---- de aquí en adelante, sólo desde esta computadora
 
@@ -498,6 +562,18 @@ async function manejar(req, res) {
   const destino = path.normalize(path.join(PUBLICO, ruta === '/' ? 'index.html' : ruta));
   if (!destino.startsWith(PUBLICO + path.sep)) return enviarError(res, 403, 'Prohibido');
   return enviarArchivo(req, res, destino);
+}
+
+/** Servidor público (puerto 5051): SÓLO fotos y marca. Es el que se publica en internet. */
+function manejarSoloPublico(req, res) {
+  const peticion = leerRuta(req);
+  if (manejarPublico(req, res, peticion)) return;
+  if (peticion.partes.length === 0) {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(paginaNoEncontrada(leerConfig()));
+    return;
+  }
+  enviarError(res, 404, 'No encontrado');
 }
 
 async function manejarApi(req, res, metodo, partes, url) {
@@ -527,7 +603,13 @@ async function manejarApi(req, res, metodo, partes, url) {
 
   if (recurso === 'red' && metodo === 'GET') {
     const config = leerConfig();
-    return enviarJSON(res, 200, { ips: ipsLocales(), puerto: PUERTO, urlBase: urlBase(config) });
+    return enviarJSON(res, 200, {
+      ips: ipsLocales(),
+      puerto: PUERTO,
+      urlBase: urlBase(config),
+      urlPublica: config.compartir.internet !== false ? tunel.url : '',
+      tunel: { estado: tunel.estado, detalle: tunel.detalle },
+    });
   }
 
   if (recurso === 'estadisticas' && metodo === 'GET') {
@@ -656,7 +738,8 @@ async function manejarApi(req, res, metodo, partes, url) {
       await guardarMeta(sesion);
       sesiones.set(nuevo, sesion);
       log(`Nueva sesión ${nuevo} (${sesion.meta.modo})`);
-      return enviarJSON(res, 201, { id: nuevo, url: `${urlBase(config)}/g/${nuevo}` });
+      const base = urlDescarga(config);
+      return enviarJSON(res, 201, { id: nuevo, url: `${base}/g/${nuevo}`, publica: Boolean(tunel.url) && base === tunel.url });
     }
 
     const sesion = id && ID_VALIDO.test(id) && sesiones.get(id);
@@ -685,7 +768,7 @@ async function manejarApi(req, res, metodo, partes, url) {
     // eliminar (se mueve a la papelera, no se borra)
     if (metodo === 'DELETE' && !extra) {
       const destino = path.join(PAPELERA, `${sesion.meta.eventoSlug}__${id}`);
-      await fsp.rename(sesion.dir, destino);
+      await moverConReintentos(sesion.dir, destino);
       sesiones.delete(id);
       log(`Sesión ${id} enviada a la papelera`);
       return enviarJSON(res, 200, { ok: true });
@@ -695,16 +778,123 @@ async function manejarApi(req, res, metodo, partes, url) {
   return enviarError(res, 404, 'Ruta desconocida');
 }
 
+// ---------------------------------------------------------------- enlace por internet
+//
+// Con "cloudflared" (programa gratuito de Cloudflare, sin cuenta) se abre un
+// enlace público https://….trycloudflare.com hacia el servidor público (sólo
+// fotos). Así el QR funciona con datos móviles o desde cualquier Wi-Fi.
+// El enlace cambia cada vez que se abre el programa; no hace falta configurar nada.
+
+const ARCHIVO_PID_TUNEL = path.join(DATOS, 'tunel.pid');
+
+function rutaCloudflared() {
+  for (const nombre of ['cloudflared.exe', 'cloudflared']) {
+    const ruta = path.join(HERRAMIENTAS, nombre);
+    if (fs.existsSync(ruta)) return ruta;
+  }
+  return 'cloudflared'; // instalado en Windows (en el PATH)
+}
+
+/** Cierra un túnel que haya quedado abierto de una ejecución anterior. */
+function cerrarTunelAnterior() {
+  try {
+    const pid = Number(fs.readFileSync(ARCHIVO_PID_TUNEL, 'utf8'));
+    // taskkill con filtro: sólo cierra ese número de proceso si de verdad es cloudflared
+    // (Windows reutiliza los números; así nunca se cierra otro programa por error)
+    if (pid && process.platform === 'win32') {
+      spawnSync('taskkill', ['/PID', String(pid), '/FI', 'IMAGENAME eq cloudflared.exe', '/F'], { windowsHide: true });
+    }
+  } catch {
+    // no había túnel anterior
+  }
+  fs.rmSync(ARCHIVO_PID_TUNEL, { force: true });
+}
+
+function iniciarTunel() {
+  if (leerConfig().compartir.internet === false) {
+    Object.assign(tunel, { estado: 'apagado', url: '', detalle: 'Desactivado en los ajustes' });
+    return;
+  }
+  Object.assign(tunel, { estado: 'conectando', url: '', detalle: '' });
+
+  const proceso = spawn(rutaCloudflared(), [
+    'tunnel', '--no-autoupdate', '--url', `http://127.0.0.1:${PUERTO_PUBLICO}`,
+  ], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  tunel.proceso = proceso;
+
+  const leer = (datos) => {
+    const texto = datos.toString();
+    const enlace = texto.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
+    if (enlace && !tunel.url) {
+      Object.assign(tunel, { url: enlace[0], estado: 'activo', detalle: '', intentos: 0 });
+      log(`Enlace por internet listo: ${tunel.url}`);
+    }
+    const falla = texto.match(/ERR[^\n]*(failed|error)[^\n]*/i);
+    if (falla && !tunel.url) tunel.detalle = falla[0].slice(0, 200);
+  };
+  proceso.stdout.on('data', leer);
+  proceso.stderr.on('data', leer);
+  if (proceso.pid) fs.writeFileSync(ARCHIVO_PID_TUNEL, String(proceso.pid));
+
+  proceso.on('error', (err) => {
+    tunel.proceso = null;
+    if (err.code === 'ENOENT') {
+      Object.assign(tunel, { estado: 'falta-programa', detalle: 'Falta cloudflared.exe en la carpeta "herramientas"' });
+      log('Enlace por internet: falta cloudflared.exe (el QR funcionará sólo en el Wi-Fi del evento)');
+    } else {
+      Object.assign(tunel, { estado: 'error', detalle: err.message });
+    }
+  });
+
+  proceso.on('exit', () => {
+    tunel.proceso = null;
+    fs.rmSync(ARCHIVO_PID_TUNEL, { force: true });
+    if (tunel.cerrando || tunel.estado === 'falta-programa' || tunel.estado === 'apagado') return;
+    // se cayó (sin internet, por ejemplo): se reintenta cada vez con más espera
+    tunel.intentos += 1;
+    Object.assign(tunel, { url: '', estado: 'reconectando' });
+    const espera = Math.min(60, 5 * tunel.intentos);
+    log(`Enlace por internet caído; reintento en ${espera} s`);
+    setTimeout(iniciarTunel, espera * 1000);
+  });
+}
+
+function cerrarTunel() {
+  tunel.cerrando = true;
+  tunel.proceso?.kill();
+  fs.rmSync(ARCHIVO_PID_TUNEL, { force: true });
+}
+
+// al cerrar la ventana del servidor (SIGHUP en Windows) o con Ctrl+C, se cierra también el túnel
+for (const senal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+  process.on(senal, () => {
+    cerrarTunel();
+    process.exit(0);
+  });
+}
+process.on('exit', cerrarTunel);
+
 // ---------------------------------------------------------------- arranque
 
 indexarSesiones();
 
+const alFallar = (res) => (err) => {
+  log('Error:', err.message);
+  if (!res.headersSent) enviarError(res, err.codigo || 500, err.message || 'Error interno');
+  else res.destroy();
+};
+
 const servidor = http.createServer((req, res) => {
-  manejar(req, res).catch((err) => {
-    log('Error:', err.message);
-    if (!res.headersSent) enviarError(res, err.codigo || 500, err.message || 'Error interno');
-    else res.destroy();
-  });
+  manejar(req, res).catch(alFallar(res));
+});
+
+// sólo escucha dentro de esta computadora: le llega el túnel, nadie más
+const servidorPublico = http.createServer((req, res) => {
+  try {
+    manejarSoloPublico(req, res);
+  } catch (err) {
+    alFallar(res)(err);
+  }
 });
 
 servidor.on('error', (err) => {
@@ -720,8 +910,14 @@ servidor.listen(PUERTO, '0.0.0.0', () => {
   console.log('');
   console.log('  ███ Sonría PJs ███');
   console.log(`  Cabina:            http://localhost:${PUERTO}`);
-  console.log(`  Descargas (QR):    ${urlBase(config)}/g/<sesión>`);
+  console.log(`  QR en el Wi-Fi:    ${urlBase(config)}/g/<sesión>`);
+  console.log('  QR por internet:   abriendo enlace de Cloudflare…');
   console.log(`  Fotos guardadas en ${FOTOS}`);
   console.log(`  Sesiones registradas: ${sesiones.size}`);
   console.log('');
+
+  servidorPublico.listen(PUERTO_PUBLICO, '127.0.0.1', () => {
+    cerrarTunelAnterior();
+    iniciarTunel();
+  });
 });

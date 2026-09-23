@@ -9,3 +9,6 @@ Thumbs.db
 desktop.ini
 .DS_Store
 *.log
+
+# programa de Cloudflare para el QR por internet (se descarga con "Activar QR por internet.bat")
+herramientas/

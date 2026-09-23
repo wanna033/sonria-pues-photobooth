@@ -11,8 +11,8 @@ Funciona de dos maneras con el mismo código:
 | Filtros, stickers y diseños propios | ✅ | ✅ |
 | Impresión a la medida exacta del diseño | ✅ | ❌ |
 | Galería y fotos guardadas en la computadora | ✅ | ❌ (se descargan en el dispositivo) |
-| Código QR en la red del evento | ✅ | ❌ |
-| Código QR con datos móviles (subiendo a la nube) | ✅ | ✅ |
+| Código QR con datos móviles o cualquier Wi-Fi (automático) | ✅ | ❌ |
+| Código QR subiendo las fotos a la nube (opcional) | ✅ | ✅ |
 
 👉 **Probar la cabina en el navegador:** <https://tesaludaw33.github.io/sonria-pues-photobooth/public/>
 
@@ -28,13 +28,18 @@ Funciona de dos maneras con el mismo código:
 Todo lo demás (textos, colores, plantillas, tiempos, impresión) se cambia desde los ajustes,
 sin tocar el código. Las instrucciones completas están en [LEEME.md](LEEME.md).
 
-## Descargas con datos móviles
+## QR con datos móviles o desde cualquier Wi-Fi
 
-Para que el QR funcione fuera del Wi-Fi del evento, la cabina sube cada sesión a
-[Cloudinary](https://cloudinary.com) (plan gratuito, sin claves secretas) y el QR abre la
-página `g/` de este mismo sitio. Se configura en *Ajustes → Impresión y QR*.
+La cabina abre sola un enlace público y seguro de Cloudflare (`trycloudflare.com`, gratis
+y sin cuenta) y el QR de cada sesión lo usa. Por ese enlace **sólo** se ven las fotos de
+cada sesión; los ajustes y la galería quedan cerrados.
 
-Sin internet, el QR vuelve solo a la dirección de la red local.
+La primera vez, doble clic en **`Activar QR por internet.bat`** para descargar el programa
+oficial de Cloudflare. Sin internet, el QR vuelve solo a la dirección de la red local.
+
+Opcional: para que los enlaces sigan funcionando con la computadora apagada, la cabina
+puede subir cada sesión a [Cloudinary](https://cloudinary.com) (plan gratuito) y el QR abre
+la página `g/` de este mismo sitio. Se configura en *Ajustes → Impresión y QR*.
 
 ## Qué hay en cada carpeta
 

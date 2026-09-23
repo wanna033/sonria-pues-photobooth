@@ -111,9 +111,11 @@ const SECCIONES = [
       { tipo: 'accion', etiqueta: 'Prueba', boton: '🖨️ Imprimir página de prueba', accion: 'imprimirPrueba', ayuda: 'Imprime la plantilla predeterminada en la impresora predeterminada de Windows. La hoja mide exactamente lo que la plantilla (las integradas, 10×15 cm; las tuyas, lo que indiques en "Mis diseños"). Pon ese mismo tamaño de papel en la impresora y sin bordes.' },
       { h: 'Descarga con código QR' },
       { ruta: 'compartir.qr', tipo: 'bool', etiqueta: 'Mostrar código QR' },
-      { ruta: 'compartir.urlBase', tipo: 'texto', etiqueta: 'Dirección para el QR', ayuda: 'Déjala vacía para detectarla sola. Se usa cuando el QR funciona sólo en la red del evento.', marcador: 'red' },
+      { ruta: 'compartir.internet', tipo: 'bool', etiqueta: 'QR por internet (datos móviles y cualquier Wi-Fi)', ayuda: 'Abre solo un enlace seguro de Cloudflare, gratis y sin cuenta. Por ese enlace sólo se ven las fotos de cada sesión. Si no hay internet, el QR usa el Wi-Fi del evento. Los cambios se aplican al volver a abrir el programa.' },
+      { tipo: 'tunel' },
+      { ruta: 'compartir.urlBase', tipo: 'texto', etiqueta: 'Dirección en el Wi-Fi del evento', ayuda: 'Déjala vacía para detectarla sola. Se usa cuando no hay enlace por internet.', marcador: 'red' },
       { tipo: 'red' },
-      { h: 'Descarga con datos móviles o desde otro Wi-Fi' },
+      { h: 'Opcional: guardar las fotos en la nube (Cloudinary)' },
       { tipo: 'ayuda-nube' },
       { ruta: 'compartir.nube.activo', tipo: 'bool', etiqueta: 'Subir cada sesión a internet', ayuda: 'Si no hay internet en el evento, el QR vuelve solo a la red local.' },
       { ruta: 'compartir.nube.cloudName', tipo: 'texto', etiqueta: 'Cloud name de Cloudinary', ayuda: 'Aparece arriba en el panel de Cloudinary. No es una clave secreta.' },
@@ -375,6 +377,19 @@ export class Ajustes {
         el('br'), 'Ninguno de los dos es una clave secreta. Ten en cuenta que las fotos quedan en internet: ',
         'cualquiera con el enlace puede verlas.');
     }
+    if (campo.tipo === 'tunel') {
+      const estado = this.red?.tunel?.estado;
+      const mensajes = {
+        activo: ['✅ Activo. Los QR funcionan con datos móviles y desde cualquier Wi-Fi:', this.red?.urlPublica],
+        conectando: ['⏳ Abriendo el enlace por internet… (tarda unos segundos al abrir el programa)'],
+        reconectando: ['⏳ Sin conexión a internet; reintentando. Mientras tanto el QR usa el Wi-Fi del evento.'],
+        'falta-programa': ['⚠️ Falta el programa cloudflared.exe en la carpeta "herramientas". Mientras tanto el QR sólo funciona en el Wi-Fi del evento.'],
+        apagado: ['Apagado: el QR sólo funciona en el Wi-Fi del evento.'],
+        error: ['⚠️ No se pudo abrir el enlace por internet:', this.red?.tunel?.detalle],
+      };
+      const [texto, extra] = mensajes[estado] || ['Estado desconocido (el servidor no respondió).'];
+      return el('p', { class: 'nota' }, texto, extra ? el('br') : null, extra ? el('code', {}, extra) : null);
+    }
     if (campo.tipo === 'red') {
       const ips = this.red?.ips?.length ? this.red.ips.join(', ') : 'sin conexión de red';
       return el('p', { class: 'nota' },
@@ -570,7 +585,9 @@ export class Ajustes {
   /** Muestra una sesión ya tomada en grande, con su código QR para descargarla otra vez. */
   verSesion(s) {
     this.raiz.querySelector('.visor-sesion')?.remove();
-    const url = `${this.red?.urlBase || location.origin}/g/${s.id}`;
+    // el enlace por internet (si está activo) sirve con datos móviles; si no, el del Wi-Fi
+    const porInternet = Boolean(this.red?.urlPublica);
+    const url = `${this.red?.urlPublica || this.red?.urlBase || location.origin}/g/${s.id}`;
     const archivo = `/m/${s.id}/${s.principal}`;
     const medio = /\.(mp4|webm)$/.test(s.principal)
       ? el('video', { src: archivo, autoplay: true, loop: true, muted: true, playsinline: true, controls: true })
@@ -598,7 +615,9 @@ export class Ajustes {
       el('aside', { class: 'visor-panel' },
         el('h3', {}, 'Escanea para descargar'),
         qr,
-        el('p', { class: 'nota' }, 'Abre la cámara del celular y apunta al código. El celular debe estar en el mismo Wi-Fi que esta computadora.'),
+        el('p', { class: 'nota' }, porInternet
+          ? 'Abre la cámara del celular y apunta al código. Funciona con datos móviles o desde cualquier Wi-Fi.'
+          : 'Abre la cámara del celular y apunta al código. El celular debe estar en el mismo Wi-Fi que esta computadora.'),
         el('code', { class: 'visor-url' }, url),
         el('p', { class: 'nota' }, detalle),
         el('div', { class: 'fila-botones' },
@@ -622,7 +641,7 @@ export class Ajustes {
       el('h3', {}, 'Impresora'),
       p('Pon tu impresora de fotos como predeterminada en Windows, con papel 10×15 cm (4×6") y sin bordes. Las tiras de 5×15 cm salen dos por hoja: corta por la mitad (muchas impresoras de sublimación lo hacen solas con la opción “2 inch cut”).'),
       el('h3', {}, 'Código QR'),
-      p('Los invitados descargan sus fotos desde su celular conectados al mismo Wi-Fi que esta computadora. Si no hay Wi-Fi en el lugar, crea uno con un router portátil o con la “Zona con cobertura inalámbrica móvil” de Windows.'),
+      p('Si esta computadora tiene internet, los invitados descargan sus fotos con sus datos móviles o desde cualquier Wi-Fi: la cabina abre sola un enlace seguro de Cloudflare (revisa su estado en Impresión y QR). Sin internet, el QR funciona sólo para quienes estén en el mismo Wi-Fi que esta computadora.'),
       el('h3', {}, 'Cámara profesional'),
       p('Canon (EOS Webcam Utility), Nikon (Webcam Utility), Sony (Imaging Edge Webcam) y Fujifilm (X Webcam) permiten usar tu cámara como webcam. Instala la utilidad, conecta la cámara por USB y elígela en la pestaña Cámara.'),
       el('h3', {}, 'Dónde quedan las fotos'),
