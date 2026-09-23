@@ -14,6 +14,8 @@
  */
 
 const http = require('http');
+const https = require('https');
+const dns = require('dns');
 const fs = require('fs');
 const fsp = fs.promises;
 const path = require('path');
@@ -171,8 +173,13 @@ function urlBase(config) {
 
 /** Dirección que va en el QR: la de internet si el túnel está activo; si no, la de la red local. */
 function urlDescarga(config) {
-  if (config.compartir.internet !== false && tunel.url) return tunel.url;
+  if (config.compartir.internet !== false && enlaceVerificado()) return tunel.url;
   return urlBase(config);
+}
+
+/** El enlace sólo va en un QR si se comprobó desde internet hace poco (nunca uno caído). */
+function enlaceVerificado() {
+  return Boolean(tunel.url) && tunel.estado === 'activo' && Date.now() - tunel.verificado < 90 * 1000;
 }
 
 function esLocal(req) {
@@ -301,7 +308,19 @@ const sesiones = new Map();
 let estadoCamara = null;
 
 /** Estado del enlace por internet (túnel de Cloudflare). */
-const tunel = { url: '', estado: 'apagado', detalle: '', proceso: null, intentos: 0, cerrando: false };
+const tunel = {
+  url: '',
+  estado: 'apagado',
+  detalle: '',
+  proceso: null,
+  intentos: 0,
+  cerrando: false,
+  reiniciando: false,
+  verificado: 0, // última vez que el enlace respondió desde internet
+  nacio: 0, // cuándo se obtuvo el enlace actual
+  fallos: 0,
+  comprobando: false,
+};
 
 function indexarSesiones() {
   sesiones.clear();
@@ -567,6 +586,12 @@ async function manejar(req, res) {
 /** Servidor público (puerto 5051): SÓLO fotos y marca. Es el que se publica en internet. */
 function manejarSoloPublico(req, res) {
   const peticion = leerRuta(req);
+  if (peticion.partes[0] === 'salud' && peticion.partes.length === 1) {
+    // la cabina se consulta a sí misma por internet para saber que el enlace sirve
+    res.writeHead(200, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
+    res.end('ok');
+    return;
+  }
   if (manejarPublico(req, res, peticion)) return;
   if (peticion.partes.length === 0) {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -607,8 +632,12 @@ async function manejarApi(req, res, metodo, partes, url) {
       ips: ipsLocales(),
       puerto: PUERTO,
       urlBase: urlBase(config),
-      urlPublica: config.compartir.internet !== false ? tunel.url : '',
-      tunel: { estado: tunel.estado, detalle: tunel.detalle },
+      urlPublica: config.compartir.internet !== false && enlaceVerificado() ? tunel.url : '',
+      tunel: {
+        estado: tunel.estado,
+        detalle: tunel.detalle,
+        verificadoHace: tunel.verificado ? Math.round((Date.now() - tunel.verificado) / 1000) : null,
+      },
     });
   }
 
@@ -626,6 +655,17 @@ async function manejarApi(req, res, metodo, partes, url) {
       }
     }
     return enviarJSON(res, 200, estad);
+  }
+
+  // la aplicación (Sonria Pues.exe) lo llama al cerrar la cabina: cierra el enlace por internet y se apaga
+  if (recurso === 'apagar' && metodo === 'POST') {
+    log('Cerrando Sonría Pues…');
+    enviarJSON(res, 200, { ok: true });
+    setTimeout(() => {
+      cerrarTunel();
+      process.exit(0);
+    }, 300);
+    return;
   }
 
   if (recurso === 'abrir-carpeta' && metodo === 'POST') {
@@ -826,8 +866,10 @@ function iniciarTunel() {
     const texto = datos.toString();
     const enlace = texto.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
     if (enlace && !tunel.url) {
-      Object.assign(tunel, { url: enlace[0], estado: 'activo', detalle: '', intentos: 0 });
-      log(`Enlace por internet listo: ${tunel.url}`);
+      // todavía no se usa: primero hay que comprobar que responde desde internet
+      Object.assign(tunel, { url: enlace[0], estado: 'verificando', detalle: '', intentos: 0, verificado: 0, nacio: Date.now(), fallos: 0 });
+      log(`Enlace por internet creado, comprobando: ${tunel.url}`);
+      prepararDnsCloudflare().finally(() => setTimeout(comprobarTunel, 3000));
     }
     const falla = texto.match(/ERR[^\n]*(failed|error)[^\n]*/i);
     if (falla && !tunel.url) tunel.detalle = falla[0].slice(0, 200);
@@ -850,6 +892,13 @@ function iniciarTunel() {
     tunel.proceso = null;
     fs.rmSync(ARCHIVO_PID_TUNEL, { force: true });
     if (tunel.cerrando || tunel.estado === 'falta-programa' || tunel.estado === 'apagado') return;
+    if (tunel.reiniciando) {
+      // lo cerramos a propósito porque dejó de responder: se abre uno nuevo enseguida
+      tunel.reiniciando = false;
+      Object.assign(tunel, { url: '', estado: 'reconectando' });
+      setTimeout(iniciarTunel, 1000);
+      return;
+    }
     // se cayó (sin internet, por ejemplo): se reintenta cada vez con más espera
     tunel.intentos += 1;
     Object.assign(tunel, { url: '', estado: 'reconectando' });
@@ -864,6 +913,90 @@ function cerrarTunel() {
   tunel.proceso?.kill();
   fs.rmSync(ARCHIVO_PID_TUNEL, { force: true });
 }
+
+/**
+ * Comprueba desde internet que el enlace responda (igual que lo haría un
+ * celular: DNS público de Cloudflare + HTTPS). Cloudflare a veces da de baja
+ * los enlaces rápidos aunque el programa siga abierto; si pasa, se abre otro.
+ */
+// Para comprobar el enlace NO se usa la memoria de DNS de Windows (guarda hasta
+// 15 min los "no existe"). Primero se pregunta directo a los servidores de
+// Cloudflare que crean los enlaces (responden al instante, sin memoria vieja) y,
+// si no se puede, a DNS públicos.
+const dnsPublico = new dns.Resolver();
+dnsPublico.setServers(['1.1.1.1', '8.8.8.8']);
+let dnsCloudflare = null;
+
+async function prepararDnsCloudflare() {
+  if (dnsCloudflare) return;
+  try {
+    const nombres = await dns.promises.resolveNs('trycloudflare.com');
+    const ips = (await Promise.all(nombres.map((n) => dns.promises.resolve4(n).catch(() => [])))).flat();
+    if (!ips.length) return;
+    dnsCloudflare = new dns.Resolver({ timeout: 3000, tries: 2 });
+    dnsCloudflare.setServers(ips.slice(0, 4));
+  } catch {
+    // sin esto se usan los DNS públicos
+  }
+}
+
+function buscarEnDnsPublico(nombre, opciones, listo) {
+  const responder = (direcciones) => {
+    if (opciones?.all) return listo(null, direcciones.map((address) => ({ address, family: 4 })));
+    return listo(null, direcciones[0], 4);
+  };
+  const conPublico = () => dnsPublico.resolve4(nombre, (err, direcciones) => {
+    if (err || !direcciones?.length) return listo(err || new Error('El enlace no existe en internet'));
+    responder(direcciones);
+  });
+  if (!dnsCloudflare) return conPublico();
+  dnsCloudflare.resolve4(nombre, (err, direcciones) => {
+    if (err || !direcciones?.length) return conPublico();
+    responder(direcciones);
+  });
+}
+
+function comprobarTunel() {
+  if (!tunel.url || tunel.comprobando || tunel.cerrando) return;
+  tunel.comprobando = true;
+  const url = tunel.url;
+  const peticion = https.get(`${url}/salud?t=${Date.now()}`, { timeout: 10000, lookup: buscarEnDnsPublico }, (res) => {
+    res.resume();
+    terminar(res.statusCode === 200);
+  });
+  peticion.on('timeout', () => peticion.destroy(new Error('sin respuesta')));
+  peticion.on('error', () => terminar(false));
+
+  let listo = false;
+  function terminar(ok) {
+    if (listo) return;
+    listo = true;
+    tunel.comprobando = false;
+    if (url !== tunel.url) return; // mientras tanto se cambió de enlace
+
+    if (ok) {
+      if (tunel.estado !== 'activo') log(`Enlace por internet listo: ${url}`);
+      Object.assign(tunel, { estado: 'activo', verificado: Date.now(), fallos: 0, detalle: '' });
+      return;
+    }
+
+    // uno recién creado puede tardar en aparecer en internet (DNS): se espera hasta 2 minutos
+    if (tunel.estado === 'verificando' && Date.now() - tunel.nacio < 120 * 1000) {
+      setTimeout(comprobarTunel, 4000);
+      return;
+    }
+    tunel.fallos += 1;
+    if (tunel.estado === 'activo' && tunel.fallos < 3) return; // un fallo aislado no basta
+    log(`El enlace por internet dejó de responder (${url}); abriendo uno nuevo`);
+    Object.assign(tunel, { estado: 'reconectando', detalle: 'El enlace anterior dejó de responder' });
+    tunel.reiniciando = true;
+    if (tunel.proceso) tunel.proceso.kill();
+    else setTimeout(iniciarTunel, 1000);
+  }
+}
+
+// vigilancia permanente del enlace
+setInterval(comprobarTunel, 30 * 1000);
 
 // al cerrar la ventana del servidor (SIGHUP en Windows) o con Ctrl+C, se cierra también el túnel
 for (const senal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {

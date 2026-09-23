@@ -380,8 +380,9 @@ export class Ajustes {
     if (campo.tipo === 'tunel') {
       const estado = this.red?.tunel?.estado;
       const mensajes = {
-        activo: ['✅ Activo. Los QR funcionan con datos móviles y desde cualquier Wi-Fi:', this.red?.urlPublica],
+        activo: ['✅ Activo y comprobado desde internet. Los QR funcionan con datos móviles y desde cualquier Wi-Fi:', this.red?.urlPublica],
         conectando: ['⏳ Abriendo el enlace por internet… (tarda unos segundos al abrir el programa)'],
+        verificando: ['⏳ Comprobando desde internet que el enlace funcione… Mientras tanto el QR usa el Wi-Fi del evento.'],
         reconectando: ['⏳ Sin conexión a internet; reintentando. Mientras tanto el QR usa el Wi-Fi del evento.'],
         'falta-programa': ['⚠️ Falta el programa cloudflared.exe en la carpeta "herramientas". Mientras tanto el QR sólo funciona en el Wi-Fi del evento.'],
         apagado: ['Apagado: el QR sólo funciona en el Wi-Fi del evento.'],

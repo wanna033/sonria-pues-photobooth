@@ -1,4 +1,4 @@
-# Sonría PJs 📸
+# Sonría Pues Photobooth 📸
 
 Cabina de fotos para eventos: fotos impresas, GIF animados, boomerangs y video mensajes,
 con descarga por código QR desde el celular de los invitados.
@@ -7,21 +7,27 @@ Todo el programa está en esta carpeta, **incluido Node.js** (carpeta `node`), a
 instalar nada. Sólo necesita **Microsoft Edge** (viene con Windows 10 y 11) o Google Chrome.
 
 **¿Otra computadora?** Copia la carpeta completa `Sonria PJs` (por ejemplo, en una USB) y abre
-los mismos archivos `.bat`. Si copias también la carpeta `datos`, te llevas tus ajustes y tus fotos.
+`Sonria Pues.exe`. Si copias también la carpeta `datos`, te llevas tus ajustes y tus fotos.
 
 ---
 
 ## Primeros pasos
 
-1. **Configura el evento:** doble clic en **`Configurar Sonria PJs.bat`**.
-   Se abre la cabina en una ventana con los ajustes. El PIN inicial es **`1234`** (cámbialo en *General*).
+La aplicación es **`Sonria Pues.exe`** (con el icono del diafragma). En el Escritorio y en el
+menú Inicio hay dos accesos directos:
+
+1. **Sonría Pues - Ajustes:** abre la cabina en una ventana con los ajustes, para preparar el evento.
+   El PIN inicial es **`1234`** (cámbialo en *General*).
    - *Evento y marca:* nombre del evento, mensaje, colores y logotipo.
    - *Cámara:* elige tu cámara y resolución.
    - *Diseño:* plantillas, fondo, tipografía, filtros y stickers.
    - *Impresión y QR:* usa **Imprimir página de prueba** para revisar tu impresora.
-2. **Abre la cabina para el evento:** doble clic en **`Iniciar Sonria PJs.bat`**.
-   Se abre a pantalla completa y la impresión sale directo, sin ventanas de diálogo.
-3. **Para salir:** `Alt + F4`.
+2. **Sonría Pues:** abre la cabina a pantalla completa para el evento. La impresión sale directo,
+   sin ventanas de diálogo.
+3. **Para salir:** `Alt + F4`. Al cerrar la cabina se apaga todo solo (servidor y enlace por internet).
+
+No aparecen ventanas negras: el servidor funciona escondido. Los archivos `Iniciar Sonria PJs.bat`
+y `Configurar Sonria PJs.bat` siguen funcionando igual, por si los prefieres.
 
 > La primera vez, Windows preguntará si **Node.js** puede usar la red. Acepta **“Redes privadas”**:
 > es necesario para que los invitados descarguen sus fotos con el QR.
@@ -125,6 +131,9 @@ cualquier Wi-Fi**. En la pantalla final el QR dice "(funciona con tus datos móv
   reabre en cuanto vuelve la conexión.
 - El enlace cambia cada vez que abres el programa; los QR se generan en el momento, así que
   no importa. Las fotos se descargan de la computadora: deben estar encendida y conectada.
+- **Se vigila solo:** cada 30 segundos la cabina comprueba desde internet que el enlace
+  responda. Si Cloudflare lo da de baja o se cae, abre uno nuevo en unos 15 segundos, y
+  **nunca pone en un QR un enlace sin comprobar** (mientras tanto usa el Wi-Fi del evento).
 - Su estado se ve en *Ajustes → Impresión y QR*, donde también se puede apagar.
 - Usa el programa `herramientas\cloudflared.exe`. Si falta (por ejemplo, si descargaste el
   proyecto de GitHub), doble clic en **`Activar QR por internet.bat`** una sola vez.

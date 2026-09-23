@@ -21,9 +21,14 @@ Funciona de dos maneras con el mismo código:
 ## Usarla en la computadora (Windows)
 
 1. Instala [Node.js](https://nodejs.org) (versión LTS) y descarga este repositorio.
-2. Doble clic en **`Configurar Sonria PJs.bat`** para preparar el evento (PIN inicial `1234`).
-3. Doble clic en **`Iniciar Sonria PJs.bat`** el día del evento: abre a pantalla completa
-   e imprime directo. Para salir, `Alt + F4`.
+2. Doble clic en **`Activar QR por internet.bat`** (una sola vez).
+3. Abre **`Sonria Pues.exe`**: la cabina a pantalla completa, con impresión directa.
+   Con `Sonria Pues.exe --configurar` se abre en una ventana con los ajustes (PIN inicial `1234`).
+   Para salir, `Alt + F4`; al cerrar se apaga todo solo.
+
+`Sonria Pues.exe` es un lanzador pequeño; su código está en `lanzador/SonriaPues.cs` y se
+compila con `lanzador/compilar.bat`. Al descargarlo de internet, Windows puede mostrar un aviso
+de SmartScreen porque no está firmado: *Más información → Ejecutar de todas formas*.
 
 Todo lo demás (textos, colores, plantillas, tiempos, impresión) se cambia desde los ajustes,
 sin tocar el código. Las instrucciones completas están en [LEEME.md](LEEME.md).
