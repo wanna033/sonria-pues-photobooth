@@ -14,7 +14,7 @@ Funciona de dos maneras con el mismo código:
 | Código QR con datos móviles o cualquier Wi-Fi (automático) | ✅ | ❌ |
 | Código QR subiendo las fotos a la nube (opcional) | ✅ | ✅ |
 
-👉 **Probar la cabina en el navegador:** <https://tesaludaw33.github.io/sonria-pues-photobooth/public/>
+👉 **Probar la cabina en el navegador:** <https://wanna033.github.io/sonria-pues-photobooth/public/>
 
 ---
 
