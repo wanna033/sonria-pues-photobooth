@@ -111,6 +111,41 @@ Y si quieres meterte en el código:
 | Colores y estilos de las pantallas | `public\css\app.css` |
 | Valores iniciales de toda la configuración | `config.default.json` |
 
+## Que el QR funcione con datos móviles
+
+Por defecto el código QR sólo abre desde el Wi-Fi del evento. Para que funcione desde
+**cualquier red o con datos móviles**, la cabina sube cada sesión a **Cloudinary** (plan
+gratuito) y el QR abre tu página de descarga publicada en GitHub Pages.
+
+Se configura una sola vez, en *Ajustes → Impresión y QR*:
+
+1. Crea una cuenta gratis en [cloudinary.com](https://cloudinary.com) y copia tu **Cloud name**.
+2. En *Settings → Upload → Upload presets*, crea un preset con **Signing Mode: Unsigned** y copia su nombre.
+3. Pega los dos datos en los ajustes, escribe la dirección de tu página de descarga
+   (por ejemplo `https://tuusuario.github.io/sonria-pues-photobooth/g`) y activa
+   **"Subir cada sesión a internet"**.
+4. Pulsa **"Probar la conexión con la nube"**.
+
+Ninguno de esos dos datos es una clave secreta. Ten en cuenta dos cosas:
+
+- Las fotos quedan alojadas en internet y **cualquiera con el enlace puede verlas**.
+- Si en el evento no hay internet, la subida falla sin romper nada: el QR vuelve
+  automáticamente a la dirección de la red local.
+
+Por defecto sólo se suben la tira, el GIF y el video (no las fotos sueltas), para que la
+espera sea corta y el código QR sencillo.
+
+## La versión web (misma cabina en el navegador)
+
+El mismo código funciona publicado como página web, por ejemplo en GitHub Pages. Ahí:
+
+- Sí funcionan: la cámara, los modos, filtros, stickers, plantillas, tus diseños y la
+  descarga del recuerdo; y el código QR si configuraste la nube.
+- No funcionan: la impresión desde la cabina, la galería y las fotos guardadas en disco.
+  Los ajustes y los diseños se guardan **en ese mismo dispositivo**, no en la computadora.
+
+La cabina detecta sola si hay servidor detrás; no hay que configurar nada.
+
 ## Atajos
 
 - **Ajustes:** engrane casi invisible arriba a la derecha del inicio, o `Ctrl + Shift + A`.
