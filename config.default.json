@@ -80,19 +80,24 @@
   "impresion": {
     "habilitada": true,
     "copiasMaximas": 3,
-    "copiasPorDefecto": 1
+    "copiasPorDefecto": 1,
+    "controlarPapel": false,
+    "avisoPapel": 20,
+    "qrEnImpresion": false,
+    "qrPosicion": "abajo-derecha"
   },
   "compartir": {
     "qr": true,
     "internet": true,
     "urlBase": "",
+    "qrEventoEnInicio": false,
     "nube": {
       "activo": false,
       "servicio": "cloudinary",
       "cloudName": "",
       "preset": "",
       "subirFotosSueltas": false,
-      "urlGaleria": ""
+      "urlGaleria": "https://wanna033.github.io/sonria-pues-photobooth/g"
     }
   },
   "general": {

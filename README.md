@@ -42,9 +42,14 @@ cada sesión; los ajustes y la galería quedan cerrados.
 La primera vez, doble clic en **`Activar QR por internet.bat`** para descargar el programa
 oficial de Cloudflare. Sin internet, el QR vuelve solo a la dirección de la red local.
 
-Opcional: para que los enlaces sigan funcionando con la computadora apagada, la cabina
-puede subir cada sesión a [Cloudinary](https://cloudinary.com) (plan gratuito) y el QR abre
-la página `g/` de este mismo sitio. Se configura en *Ajustes → Impresión y QR*.
+Para que los QR funcionen **siempre** (días después y con la computadora apagada), la cabina
+sube cada sesión a [Cloudinary](https://cloudinary.com) (plan gratuito) y el QR abre la
+página `g/` de este mismo sitio con un enlace fijo. Si no hay internet en el evento, las
+fotos se suben solas en cuanto vuelve. Se configura en *Ajustes → Impresión y QR*.
+
+Funciones profesionales: QR impreso en la foto, galería con todas las fotos del evento,
+botón para compartir en WhatsApp/Instagram, pestaña **Estado** (cámara, impresora, papel,
+internet, nube y disco), contador de papel y exportación del evento en ZIP.
 
 ## Qué hay en cada carpeta
 

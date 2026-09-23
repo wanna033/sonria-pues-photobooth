@@ -288,6 +288,32 @@ h1, h2, h3 { margin: 0; }
   font-size: 15px;
   white-space: nowrap;
 }
+/* el aviso del papel va arriba del de la cámara para que no se encimen */
+.aviso-papel { bottom: 68px; color: #fff; }
+
+/* QR con la galería de todo el evento, en la esquina del inicio */
+.qr-evento {
+  /* arriba a la derecha (debajo del engrane): no tapa el botón de comenzar */
+  position: absolute;
+  right: clamp(14px, 2.5vmin, 28px);
+  top: 76px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 18px;
+  background: #fff;
+  color: #2e2821;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  font-size: clamp(13px, 1.6vmin, 16px);
+  font-weight: 600;
+  text-align: center;
+  max-width: 190px;
+}
+.qr-evento-codigo { width: clamp(110px, 15vmin, 160px); aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: #fff; }
+.qr-evento-codigo svg { display: block; width: 100%; height: 100%; }
 
 /* ---------------------------------------------------------------- modo */
 
@@ -870,7 +896,8 @@ h1, h2, h3 { margin: 0; }
 .ajustes-pestanas button.activa { background: var(--superficie-fuerte); color: #fff; }
 
 .ajustes-contenido { overflow-y: auto; padding: 22px 28px 40px; }
-.ajustes-contenido h3 { font-size: 18px; margin: 26px 0 12px; color: var(--secundario); }
+/* el panel siempre es oscuro: los títulos van en el color principal, que contrasta */
+.ajustes-contenido h3 { font-size: 18px; margin: 26px 0 12px; color: var(--primario); }
 .ajustes-contenido h3:first-child { margin-top: 0; }
 
 .campo {
@@ -922,6 +949,36 @@ h1, h2, h3 { margin: 0; }
 .estadisticas div { padding: 16px; border-radius: 16px; background: var(--superficie); }
 .estadisticas strong { display: block; font-size: 34px; }
 .estadisticas span { color: var(--texto-suave); font-size: 14px; }
+
+/* pestaña Estado */
+.estado-tarjetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 12px; }
+.estado-tarjeta {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--superficie);
+  border-left: 5px solid rgba(255, 255, 255, 0.2);
+}
+.estado-tarjeta.ok { border-left-color: #3fb96b; }
+.estado-tarjeta.aviso { border-left-color: #f0b429; }
+.estado-tarjeta.mal { border-left-color: #e5534b; background: rgba(229, 83, 75, 0.12); }
+.estado-tarjeta.info { border-left-color: #6ea8fe; }
+.estado-icono { font-size: 22px; line-height: 1.2; }
+.estado-tarjeta strong { display: block; margin-bottom: 4px; }
+.estado-tarjeta p { margin: 0; color: var(--texto-suave); font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.resultado-prueba:empty { display: none; }
+.resultado-prueba { margin-top: 10px; }
+.boton-prueba-nube { width: 100%; }
+
+/* galería de todo el evento */
+.galeria-evento { display: flex; gap: 16px; align-items: flex-start; margin-top: 14px; padding: 14px; border-radius: 16px; background: var(--superficie); }
+.galeria-evento p { margin: 6px 0 8px; }
+.galeria-evento > div { min-width: 0; }
+.galeria-evento code { display: block; overflow-wrap: anywhere; }
+.qr-mini { flex: 0 0 auto; width: 130px; aspect-ratio: 1; border-radius: 12px; overflow: hidden; background: #fff; }
+.qr-mini svg { display: block; width: 100%; height: 100%; }
 
 .galeria { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
 .galeria figure { margin: 0; padding: 8px; border-radius: 14px; background: var(--superficie); }

@@ -17,6 +17,7 @@ export const GRUPOS_TEXTOS = [
     titulo: 'Pantalla de inicio',
     claves: [
       ['inicioBoton', 'Botón para comenzar', 'Toca para comenzar'],
+      ['inicioQrEvento', 'Texto junto al QR de la galería del evento', 'Todas las fotos del evento'],
     ],
   },
   {

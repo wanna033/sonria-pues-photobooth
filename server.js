@@ -36,6 +36,7 @@ const ARCHIVO_CONFIG = path.join(DATOS, 'config.json');
 const CONFIG_BASE = JSON.parse(fs.readFileSync(path.join(RAIZ, 'config.default.json'), 'utf8'));
 
 const MB = 1024 * 1024;
+const INICIO = new Date().toISOString();
 // fecha-hora-aleatorio; las sesiones nuevas llevan 12 caracteres aleatorios porque
 // con el enlace por internet cualquiera podría intentar adivinarlas
 const ID_VALIDO = /^[0-9]{8}-[0-9]{6}-[0-9a-f]{6,16}$/;
@@ -46,6 +47,8 @@ const ARCHIVO_VALIDO = /^[a-z0-9_-]{1,40}\.(jpg|png|gif|webm|mp4)$/;
 const RECURSO_VALIDO = /^(logo|logo-claro|fondo)\.(png|jpg|webp)$/;
 const ID_DISENO = /^[a-z0-9][a-z0-9-]{2,70}$/;
 const EXTENSIONES_IMAGEN = ['png', 'jpg', 'webp'];
+/** Archivos de uso interno de la cabina: no se muestran al invitado ni se suben. */
+const ARCHIVOS_INTERNOS = new Set(['miniatura.jpg']);
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -88,15 +91,29 @@ function mezclar(base, extra) {
   return salida;
 }
 
+/**
+ * Los ajustes se guardan en memoria y sólo se vuelven a leer del disco si el
+ * archivo cambió (antes se leía en cada foto que descargaba un celular).
+ * Quien necesite modificar la configuración debe hacer una copia.
+ */
+const memoriaConfig = { marca: -1, config: null };
+
 function leerConfig() {
+  let marca = 0;
+  try {
+    marca = fs.statSync(ARCHIVO_CONFIG).mtimeMs;
+  } catch { /* todavía no hay ajustes guardados */ }
+  if (memoriaConfig.config && memoriaConfig.marca === marca) return memoriaConfig.config;
+  let config;
   try {
     const guardada = JSON.parse(fs.readFileSync(ARCHIVO_CONFIG, 'utf8'));
-    const config = mezclar(CONFIG_BASE, guardada);
+    config = mezclar(CONFIG_BASE, guardada);
     config.textos = limpiarTextos(guardada.textos);
-    return config;
   } catch {
-    return structuredClone(CONFIG_BASE);
+    config = structuredClone(CONFIG_BASE);
   }
+  Object.assign(memoriaConfig, { marca, config });
+  return config;
 }
 
 /**
@@ -119,6 +136,7 @@ function guardarConfig(nueva) {
   const temporal = ARCHIVO_CONFIG + '.tmp';
   fs.writeFileSync(temporal, JSON.stringify(config, null, 2));
   fs.renameSync(temporal, ARCHIVO_CONFIG);
+  memoriaConfig.config = null;
   return config;
 }
 
@@ -353,7 +371,9 @@ function resumenSesion(id, { meta }) {
     modo: meta.modo,
     plantilla: meta.plantilla || '',
     principal: meta.principal,
-    archivos: meta.archivos.map((a) => a.nombre),
+    archivos: meta.archivos.map((a) => a.nombre).filter((n) => !ARCHIVOS_INTERNOS.has(n)),
+    // vista chica para la galería y el inicio (las sesiones antiguas no la tienen)
+    miniatura: meta.archivos.some((a) => a.nombre === 'miniatura.jpg'),
     impresiones: meta.impresiones || 0,
     // enlace permanente (fotos guardadas en internet) y estado de la subida
     enlace: meta.enlace || '',
@@ -437,6 +457,11 @@ async function borrarImagenesDeDiseno(id) {
 
 /** Letra corta de cada archivo dentro del enlace (mantiene el QR pequeño). */
 const CODIGOS_NUBE = { 'recuerdo.jpg': 'r', 'animacion.gif': 'a', 'boomerang.gif': 'b', 'video.mp4': 'v', 'video.webm': 'w' };
+/** Límites del plan gratuito de Cloudinary, con margen (imagen 10 MB, video 100 MB). */
+const LIMITE_IMAGEN_NUBE = 9.5 * MB;
+const LIMITE_VIDEO_NUBE = 95 * MB;
+const MINUTO = 60 * 1000;
+const ARCHIVO_EVENTOS_NUBE = path.join(DATOS, 'nube-eventos.json');
 
 function nubeLista(config) {
   const n = config.compartir.nube;
@@ -447,17 +472,21 @@ function codigoNube(nombre) {
   return CODIGOS_NUBE[nombre] || (nombre.match(/^foto-([1-9])\.jpg$/) || [])[1] || '';
 }
 
-/** Qué archivos de la sesión se guardan en internet (sin las fotos sueltas, salvo que se pida). */
-function archivosParaNube(config, meta) {
-  return meta.archivos.map((a) => a.nombre).filter((n) =>
+/** Qué archivos se guardan en internet (sin las fotos sueltas, salvo que se pida). */
+function archivosParaNube(config, nombres) {
+  return nombres.filter((n) =>
     CODIGOS_NUBE[n] || (config.compartir.nube.subirFotosSueltas && /^foto-[1-9]\.jpg$/.test(n)));
+}
+
+function paginaDescarga(config) {
+  return String(config.compartir.nube.urlGaleria || '').trim().replace(/[?#].*$/, '').replace(/\/+$/, '');
 }
 
 function enlacePermanente(config, id, meta) {
   const cuenta = meta.nube?.cloud || config.compartir.nube.cloudName;
-  const archivos = meta.nube?.archivos || archivosParaNube(config, meta);
+  const archivos = meta.nube?.archivos || archivosParaNube(config, meta.archivos.map((a) => a.nombre));
   if (!cuenta || !archivos.length) return '';
-  const pagina = String(config.compartir.nube.urlGaleria || '').trim().replace(/\/+$/, '');
+  const pagina = paginaDescarga(config);
   if (!pagina) {
     // sin página de descarga: el QR abre directo el recuerdo principal
     const principal = archivos[0];
@@ -467,79 +496,190 @@ function enlacePermanente(config, id, meta) {
   return `${pagina}/?c=${encodeURIComponent(cuenta)}&s=${id}&a=${archivos.map(codigoNube).join('')}`;
 }
 
+/**
+ * Etiqueta secreta de cada evento en Cloudinary: con ella la página de descarga
+ * arma la galería con TODAS las fotos del evento (nadie puede adivinarla).
+ */
+function etiquetaEvento(eventoSlug) {
+  let mapa = {};
+  try { mapa = JSON.parse(fs.readFileSync(ARCHIVO_EVENTOS_NUBE, 'utf8')); } catch { /* primera vez */ }
+  if (!mapa[eventoSlug]) {
+    mapa[eventoSlug] = `sonria_${eventoSlug.slice(0, 40)}_${crypto.randomBytes(5).toString('hex')}`;
+    fs.writeFileSync(ARCHIVO_EVENTOS_NUBE, JSON.stringify(mapa, null, 2));
+  }
+  return mapa[eventoSlug];
+}
+
+/** Enlace de la galería completa del evento (necesita la página de descarga). */
+function enlaceEventoNube(config, eventoSlug) {
+  const pagina = paginaDescarga(config);
+  if (!nubeLista(config) || !pagina) return '';
+  return `${pagina}/?c=${encodeURIComponent(config.compartir.nube.cloudName)}&t=${etiquetaEvento(eventoSlug)}`;
+}
+
+/** Explica en palabras sencillas lo que responde Cloudinary. */
+function errorDeNube(mensaje, estado) {
+  const original = String(mensaje || `Cloudinary respondió ${estado}`);
+  const reglas = [
+    [/whitelisted for unsigned|must be unsigned|unsigned upload/i, 'El preset no está en modo "Unsigned". En Cloudinary: Settings → Upload → edita el preset y pon Signing Mode: Unsigned.'],
+    [/preset.*not found|not found.*preset|invalid upload preset/i, 'No existe un preset con ese nombre. Cópialo tal cual aparece en Cloudinary (Settings → Upload).'],
+    [/cloud_name|unknown api key|invalid cloud|disabled account|account.*disabled/i, 'El Cloud name no es correcto. Cópialo del panel principal (Dashboard) de Cloudinary.'],
+    [/file size too large|too large/i, 'El archivo pesa más de lo que permite el plan gratuito de Cloudinary.'],
+    [/rate limit|too many/i, 'Cloudinary pidió esperar un poco (demasiadas subidas por hora). Se reintenta sola.'],
+  ];
+  const regla = reglas.find(([patron]) => patron.test(original)) || (estado === 420 || estado === 429 ? reglas[4] : null);
+  const error = new Error(regla ? `${regla[1]} (${original})` : original);
+  // los errores de datos (4xx) no se arreglan solos; los demás sí
+  error.permanente = estado >= 400 && estado < 500 && estado !== 420 && estado !== 429;
+  return error;
+}
+
+async function llamarCloudinary(url, cuerpo, segundos = 180) {
+  let res;
+  try {
+    res = await fetch(url, { method: 'POST', body: cuerpo, signal: AbortSignal.timeout(segundos * 1000) });
+  } catch (err) {
+    const error = new Error(err.name === 'TimeoutError' ? 'La subida tardó demasiado (internet lento)' : 'Sin conexión a internet');
+    error.sinConexion = true;
+    throw error;
+  }
+  const respuesta = await res.json().catch(() => ({}));
+  if (!res.ok) throw errorDeNube(respuesta?.error?.message, res.status);
+  return respuesta;
+}
+
 async function subirArchivoANube(config, id, sesion, nombre) {
   const { cloudName, preset } = config.compartir.nube;
-  const esVideo = /\.(mp4|webm)$/.test(nombre);
-  const datos = await fsp.readFile(path.join(sesion.dir, nombre));
+  const ruta = path.join(sesion.dir, nombre);
+  const datos = await fsp.readFile(ruta);
+  let tipo = /\.(mp4|webm)$/.test(nombre) ? 'video' : 'image';
+  if (tipo === 'image' && datos.length > LIMITE_IMAGEN_NUBE) {
+    // un GIF muy pesado (boomerang largo) se guarda como video: la página lo muestra en MP4
+    if (nombre.endsWith('.gif')) tipo = 'video';
+    else throw Object.assign(new Error(`${nombre} pesa más de 10 MB (límite del plan gratuito)`), { permanente: true });
+  }
+  if (tipo === 'video' && datos.length > LIMITE_VIDEO_NUBE) {
+    throw Object.assign(new Error(`${nombre} pesa más de 100 MB (límite del plan gratuito)`), { permanente: true });
+  }
+  const esperado = `sonria/${id}/${nombre.replace(/\.[^.]+$/, '')}`;
   const cuerpo = new FormData();
   cuerpo.append('file', new Blob([datos]), nombre);
   cuerpo.append('upload_preset', preset);
-  cuerpo.append('public_id', `sonria/${id}/${nombre.replace(/\.[^.]+$/, '')}`);
-  const res = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/${esVideo ? 'video' : 'image'}/upload`, {
-    method: 'POST',
-    body: cuerpo,
-    signal: AbortSignal.timeout(180 * 1000),
-  });
-  const respuesta = await res.json().catch(() => ({}));
-  if (res.ok) return;
-  const mensaje = respuesta?.error?.message || `Cloudinary respondió ${res.status}`;
-  if (/already exists/i.test(mensaje)) return; // ya estaba subido
-  throw new Error(mensaje);
+  cuerpo.append('public_id', esperado);
+  cuerpo.append('tags', etiquetaEvento(sesion.meta.eventoSlug || 'evento'));
+  let respuesta;
+  try {
+    respuesta = await llamarCloudinary(`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/${tipo}/upload`, cuerpo);
+  } catch (err) {
+    if (/already exists/i.test(err.message)) return; // ya estaba subido
+    throw err;
+  }
+  if (respuesta.public_id && respuesta.public_id !== esperado) {
+    throw Object.assign(new Error(`El preset cambia el nombre de las fotos (quedó "${respuesta.public_id}"). En Cloudinary edita el preset y deja vacío "Folder" y apagado "Use filename".`), { permanente: true });
+  }
 }
 
 const colaNube = [];
-const estadoNube = { subiendo: false, ultimoError: '', ultimaSubida: '' };
+const estadoNube = { subiendo: false, ultimoError: '', ultimaSubida: '', subidasHoy: 0, listaActiva: null };
 
-/** Marca la sesión para guardarla en internet y devuelve su enlace permanente. */
-function prepararEnNube(config, id, sesion) {
+/** Si se cambió de cuenta de Cloudinary, lo pendiente se sube a la cuenta nueva (con enlace nuevo). */
+function alinearCuenta(config, id, sesion) {
+  const nube = sesion.meta.nube;
+  const cuenta = config.compartir.nube.cloudName;
+  if (!nube || nube.completo || !cuenta || nube.cloud === cuenta) return;
+  Object.assign(nube, { cloud: cuenta, subidos: [], error: '', fallos: 0, proximo: 0 });
+  sesion.meta.enlace = enlacePermanente(config, id, sesion.meta);
+}
+
+/**
+ * Marca la sesión para guardarla en internet y devuelve su enlace permanente.
+ * @param {string[]} [planeados] archivos que TODAVÍA se van a subir desde la cabina
+ *   (sirve para imprimir el QR en la foto antes de terminar de guardarla)
+ */
+function prepararEnNube(config, id, sesion, planeados) {
   const meta = sesion.meta;
   if (!meta.nube?.completo) {
+    const nombres = planeados || meta.archivos.map((a) => a.nombre);
     meta.nube = {
       cloud: meta.nube?.cloud || config.compartir.nube.cloudName,
-      archivos: meta.nube?.archivos || archivosParaNube(config, meta),
+      archivos: meta.nube?.archivos || archivosParaNube(config, nombres),
       subidos: meta.nube?.subidos || [],
       completo: false,
       error: '',
+      fallos: 0,
+      proximo: 0,
     };
+    alinearCuenta(config, id, sesion);
   }
   meta.enlace = enlacePermanente(config, id, meta);
-  if (!meta.nube.completo && !colaNube.includes(id)) colaNube.push(id);
   return meta.enlace;
 }
 
+/** @param {boolean} [urgente] la sesión de un invitado que está esperando va primero */
+function encolarNube(id, urgente = false) {
+  const i = colaNube.indexOf(id);
+  if (i >= 0 && !urgente) return;
+  if (i >= 0) colaNube.splice(i, 1);
+  if (urgente) colaNube.unshift(id);
+  else colaNube.push(id);
+}
+
+/**
+ * Sube las sesiones pendientes, una por una. Si una falla no detiene a las
+ * demás: se vuelve a intentar más tarde, cada vez con más espera. Sin internet
+ * se pausa todo y se reintenta cada 30 segundos.
+ */
 async function procesarColaNube() {
   if (estadoNube.subiendo) return;
   estadoNube.subiendo = true;
   try {
-    while (colaNube.length) {
-      const id = colaNube[0];
-      const sesion = sesiones.get(id);
+    for (;;) {
       const config = leerConfig();
-      if (!sesion || !nubeLista(config) || !sesion.meta.nube) {
-        colaNube.shift();
+      if (!nubeLista(config)) break;
+      const ahora = Date.now();
+      const id = colaNube.find((x) => !(sesiones.get(x)?.meta.nube?.proximo > ahora));
+      if (!id) break;
+      const sesion = sesiones.get(id);
+      if (!sesion?.meta.nube || sesion.meta.nube.completo) {
+        colaNube.splice(colaNube.indexOf(id), 1);
         continue;
       }
+      alinearCuenta(config, id, sesion);
       const nube = sesion.meta.nube;
       try {
         for (const nombre of nube.archivos) {
           if (nube.subidos.includes(nombre)) continue;
+          // la cabina todavía lo está guardando: se espera
+          if (!sesion.meta.archivos.some((a) => a.nombre === nombre)) {
+            // si a los 10 minutos no llegó (la cabina se cerró a medias), se sigue sin él
+            if (Date.now() - new Date(sesion.meta.fecha).getTime() > 10 * MINUTO) {
+              nube.archivos = nube.archivos.filter((n) => n !== nombre);
+              continue;
+            }
+            throw Object.assign(new Error(`Esperando a que la cabina termine de guardar ${nombre}`), { espera: true });
+          }
           await subirArchivoANube(config, id, sesion, nombre);
           nube.subidos.push(nombre);
           await guardarMeta(sesion);
         }
-        nube.completo = true;
-        nube.error = '';
+        Object.assign(nube, { completo: true, error: '', fallos: 0, proximo: 0 });
         await guardarMeta(sesion);
-        colaNube.shift();
-        estadoNube.ultimoError = '';
-        estadoNube.ultimaSubida = new Date().toISOString();
+        colaNube.splice(colaNube.indexOf(id), 1);
+        Object.assign(estadoNube, { ultimoError: '', ultimaSubida: new Date().toISOString() });
+        estadoNube.subidasHoy += 1;
         log(`Sesión ${id} guardada en internet`);
       } catch (err) {
-        nube.error = err.message;
+        if (err.espera) {
+          nube.proximo = Date.now() + 5000;
+          continue;
+        }
+        nube.fallos = (nube.fallos || 0) + 1;
+        const espera = err.permanente ? 60 * MINUTO : err.sinConexion ? 30 * 1000 : Math.min(30 * MINUTO, MINUTO * 2 ** Math.min(5, nube.fallos - 1));
+        Object.assign(nube, { error: err.message, proximo: Date.now() + espera });
         estadoNube.ultimoError = err.message;
         await guardarMeta(sesion).catch(() => {});
-        log(`No se pudo guardar ${id} en internet (${err.message}); se reintenta en 1 minuto`);
-        break;
+        log(`No se pudo guardar ${id} en internet (${err.message}); se reintenta en ${Math.round(espera / 1000)} s`);
+        if (err.sinConexion) break; // sin internet no tiene caso seguir con las demás
       }
     }
   } finally {
@@ -547,10 +687,282 @@ async function procesarColaNube() {
   }
 }
 
-// reintento periódico (por ejemplo, cuando vuelve el internet)
+/** Reintenta ya todo lo pendiente (al guardar los ajustes o desde el botón "Reintentar"). */
+function reintentarNube() {
+  for (const id of colaNube) {
+    const nube = sesiones.get(id)?.meta.nube;
+    if (nube) nube.proximo = 0;
+  }
+  procesarColaNube();
+}
+
+// revisión periódica (por ejemplo, cuando vuelve el internet)
 setInterval(() => {
   if (colaNube.length) procesarColaNube();
-}, 60 * 1000);
+}, 15 * 1000);
+
+/** Cuántas sesiones hay en internet, cuántas faltan y el último problema. */
+function resumenNube(config) {
+  let guardadas = 0;
+  let pendientes = 0;
+  let conError = 0;
+  let sinSubir = 0;
+  for (const { meta } of sesiones.values()) {
+    if (meta.nube?.completo) guardadas++;
+    else if (meta.nube) {
+      pendientes++;
+      if (meta.nube.error) conError++;
+    } else sinSubir++;
+  }
+  return {
+    activa: nubeLista(config),
+    guardadas,
+    pendientes,
+    conError,
+    sinSubir,
+    subiendo: estadoNube.subiendo,
+    ultimoError: conError ? estadoNube.ultimoError : '',
+    ultimaSubida: estadoNube.ultimaSubida,
+    subidasHoy: estadoNube.subidasHoy,
+    listaActiva: estadoNube.listaActiva,
+    enCola: colaNube.length,
+    enlaceEvento: enlaceEventoNube(config, slug(config.evento.nombre)),
+  };
+}
+
+/** Prueba completa de Cloudinary con los datos escritos en los ajustes (aunque no se hayan guardado). */
+async function probarNube({ cloudName, preset }) {
+  cloudName = String(cloudName || '').trim();
+  preset = String(preset || '').trim();
+  if (!cloudName || !preset) throw new Error('Escribe el Cloud name y el nombre del preset');
+  if (!/^[a-z0-9_-]{1,80}$/i.test(cloudName)) throw new Error('El Cloud name sólo lleva letras, números, "-" o "_" (sin espacios)');
+  // imagen de 1×1 píxel
+  const pixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  const esperado = `sonria/prueba/prueba-${crypto.randomBytes(4).toString('hex')}`;
+  const cuerpo = new FormData();
+  cuerpo.append('file', new Blob([pixel], { type: 'image/png' }), 'prueba.png');
+  cuerpo.append('upload_preset', preset);
+  cuerpo.append('public_id', esperado);
+  cuerpo.append('tags', 'sonria_prueba');
+  cuerpo.append('return_delete_token', 'true');
+  const r = await llamarCloudinary(`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/image/upload`, cuerpo, 30);
+  const resultado = { ok: true, carpetaCorrecta: r.public_id === esperado, publica: false, listaActiva: false, url: r.secure_url };
+
+  // ¿se puede ver desde cualquier celular?
+  const verUrl = `https://res.cloudinary.com/${cloudName}/image/upload/${r.public_id}.png`;
+  resultado.publica = await fetch(verUrl, { signal: AbortSignal.timeout(15000) }).then((x) => x.ok).catch(() => false);
+  // ¿la galería del evento puede listar las fotos? (Settings → Security → "Resource list")
+  resultado.listaActiva = await fetch(`https://res.cloudinary.com/${cloudName}/image/list/sonria_prueba.json?t=${Date.now()}`, { signal: AbortSignal.timeout(15000) })
+    .then((x) => x.ok).catch(() => false);
+  estadoNube.listaActiva = resultado.listaActiva;
+
+  // se borra la imagen de prueba
+  if (r.delete_token) {
+    const borrar = new FormData();
+    borrar.append('token', r.delete_token);
+    fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/delete_by_token`, { method: 'POST', body: borrar }).catch(() => {});
+  }
+  if (!resultado.carpetaCorrecta) {
+    resultado.ok = false;
+    resultado.error = `El preset cambia el nombre de las fotos (quedó "${r.public_id}"). En Cloudinary edita el preset: deja vacío "Folder" y apaga "Use filename".`;
+  } else if (!resultado.publica) {
+    resultado.ok = false;
+    resultado.error = 'La foto se subió, pero no se puede ver desde internet. En Cloudinary: Settings → Security, desactiva la restricción de entrega (Restricted media types).';
+  }
+  return resultado;
+}
+
+// ---------------------------------------------------------------- papel de la impresora
+// Contador de hojas: se descuenta con cada impresión y avisa antes de que se acabe.
+
+const ARCHIVO_PAPEL = path.join(DATOS, 'papel.json');
+
+function leerPapel() {
+  try {
+    const p = JSON.parse(fs.readFileSync(ARCHIVO_PAPEL, 'utf8'));
+    return { restante: Math.max(0, Math.round(Number(p.restante) || 0)), cargado: Math.max(0, Math.round(Number(p.cargado) || 0)) };
+  } catch {
+    return { restante: 0, cargado: 0 };
+  }
+}
+
+function guardarPapel(papel) {
+  fs.writeFileSync(ARCHIVO_PAPEL, JSON.stringify(papel));
+  return papel;
+}
+
+// ---------------------------------------------------------------- impresora y disco (diagnóstico)
+
+const ESTADOS_IMPRESORA = { 3: 'Lista', 4: 'Imprimiendo', 5: 'Calentando', 6: 'Detenida', 7: 'Sin conexión' };
+const ERRORES_IMPRESORA = {
+  3: 'Queda poco papel', 4: 'Sin papel', 5: 'Queda poca tinta', 6: 'Sin tinta', 7: 'Tapa abierta',
+  8: 'Papel atascado', 9: 'Sin conexión', 10: 'Necesita servicio', 11: 'Bandeja de salida llena',
+};
+const memoriaImpresora = { hora: 0, datos: null, consultando: null };
+
+/** Impresora predeterminada de Windows y su estado (se consulta cada 20 s como máximo). */
+function consultarImpresora() {
+  if (process.platform !== 'win32') return Promise.resolve(null);
+  if (Date.now() - memoriaImpresora.hora < 20 * 1000) return Promise.resolve(memoriaImpresora.datos);
+  if (memoriaImpresora.consultando) return memoriaImpresora.consultando;
+  const guion = [
+    "$p = Get-CimInstance Win32_Printer -Filter 'Default=TRUE' | Select-Object -First 1",
+    'if (-not $p) { "null"; exit }',
+    '$t = @(Get-CimInstance Win32_PrintJob | Where-Object { $_.Name -like ($p.Name + ",*") }).Count',
+    '[pscustomobject]@{ nombre = $p.Name; estado = $p.PrinterStatus; error = $p.DetectedErrorState; fueraDeLinea = $p.WorkOffline; trabajos = $t } | ConvertTo-Json -Compress',
+  ].join('; ');
+  memoriaImpresora.consultando = new Promise((resolve) => {
+    const proceso = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', guion], { windowsHide: true });
+    let salida = '';
+    const reloj = setTimeout(() => proceso.kill(), 10000);
+    proceso.stdout.on('data', (d) => { salida += d; });
+    proceso.on('error', () => resolve(null));
+    proceso.on('close', () => {
+      clearTimeout(reloj);
+      let datos = null;
+      try {
+        const p = JSON.parse(salida.trim() || 'null');
+        if (p) {
+          const problema = ERRORES_IMPRESORA[p.error] || (p.fueraDeLinea ? 'Sin conexión' : '');
+          datos = {
+            nombre: p.nombre,
+            estado: problema || ESTADOS_IMPRESORA[p.estado] || 'Lista',
+            problema,
+            trabajos: p.trabajos || 0,
+          };
+        }
+      } catch { /* sin datos */ }
+      Object.assign(memoriaImpresora, { hora: Date.now(), datos, consultando: null });
+      resolve(datos);
+    });
+  });
+  return memoriaImpresora.consultando;
+}
+
+function espacioEnDisco() {
+  try {
+    const s = fs.statfsSync(DATOS);
+    return { libre: s.bavail * s.bsize, total: s.blocks * s.bsize };
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------- exportar un evento (ZIP)
+// ZIP sin compresión (las fotos y videos ya vienen comprimidos): rápido y sin librerías.
+
+const TABLA_CRC = (() => {
+  const tabla = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    tabla[n] = c >>> 0;
+  }
+  return tabla;
+})();
+
+function crc32(datos) {
+  let c = 0xffffffff;
+  for (let i = 0; i < datos.length; i++) c = TABLA_CRC[(c ^ datos[i]) & 255] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+function fechaDos(fecha) {
+  return {
+    hora: (fecha.getHours() << 11) | (fecha.getMinutes() << 5) | (fecha.getSeconds() >> 1),
+    dia: ((fecha.getFullYear() - 1980) << 9) | ((fecha.getMonth() + 1) << 5) | fecha.getDate(),
+  };
+}
+
+/** @param {{nombre:string, ruta:string, fecha:Date}[]} entradas */
+async function crearZip(destino, entradas) {
+  const temporal = `${destino}.tmp`;
+  const archivo = await fsp.open(temporal, 'w');
+  const central = [];
+  let posicion = 0;
+  try {
+    for (const e of entradas) {
+      const datos = await fsp.readFile(e.ruta);
+      const nombre = Buffer.from(e.nombre, 'utf8');
+      const { hora, dia } = fechaDos(e.fecha);
+      if (posicion + datos.length + 200 > 0xfffffff0) throw Object.assign(new Error('El evento pesa más de 4 GB: exporta desde la carpeta'), { codigo: 413 });
+      const cabecera = Buffer.alloc(30);
+      cabecera.writeUInt32LE(0x04034b50, 0);
+      cabecera.writeUInt16LE(20, 4);
+      cabecera.writeUInt16LE(0x0800, 6); // nombres en UTF-8
+      cabecera.writeUInt16LE(0, 8); // sin compresión
+      cabecera.writeUInt16LE(hora, 10);
+      cabecera.writeUInt16LE(dia, 12);
+      const crc = crc32(datos);
+      cabecera.writeUInt32LE(crc, 14);
+      cabecera.writeUInt32LE(datos.length, 18);
+      cabecera.writeUInt32LE(datos.length, 22);
+      cabecera.writeUInt16LE(nombre.length, 26);
+      await archivo.write(cabecera);
+      await archivo.write(nombre);
+      await archivo.write(datos);
+      central.push({ nombre, crc, bytes: datos.length, posicion, hora, dia });
+      posicion += 30 + nombre.length + datos.length;
+    }
+    const inicioCentral = posicion;
+    for (const c of central) {
+      const b = Buffer.alloc(46);
+      b.writeUInt32LE(0x02014b50, 0);
+      b.writeUInt16LE(20, 4);
+      b.writeUInt16LE(20, 6);
+      b.writeUInt16LE(0x0800, 8);
+      b.writeUInt16LE(0, 10);
+      b.writeUInt16LE(c.hora, 12);
+      b.writeUInt16LE(c.dia, 14);
+      b.writeUInt32LE(c.crc, 16);
+      b.writeUInt32LE(c.bytes, 20);
+      b.writeUInt32LE(c.bytes, 24);
+      b.writeUInt16LE(c.nombre.length, 28);
+      b.writeUInt32LE(c.posicion, 42);
+      await archivo.write(b);
+      await archivo.write(c.nombre);
+      posicion += 46 + c.nombre.length;
+    }
+    const fin = Buffer.alloc(22);
+    fin.writeUInt32LE(0x06054b50, 0);
+    fin.writeUInt16LE(central.length, 8);
+    fin.writeUInt16LE(central.length, 10);
+    fin.writeUInt32LE(posicion - inicioCentral, 12);
+    fin.writeUInt32LE(inicioCentral, 16);
+    await archivo.write(fin);
+  } catch (err) {
+    await archivo.close();
+    await fsp.unlink(temporal).catch(() => {});
+    throw err;
+  }
+  await archivo.close();
+  await fsp.rename(temporal, destino);
+  return posicion + 22;
+}
+
+/** Arma el ZIP de un evento, ordenado por carpetas: impresiones, GIF, videos y fotos. */
+async function exportarEvento(eventoSlug) {
+  const carpetas = { recuerdo: 'impresiones', gif: 'gif-y-boomerang', video: 'videos', foto: 'fotos-individuales' };
+  const entradas = [];
+  const lista = [...sesiones.entries()].filter(([, s]) => s.meta.eventoSlug === eventoSlug).sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  for (const [id, { dir, meta }] of lista) {
+    const fecha = new Date(meta.fecha);
+    const p = (n) => String(n).padStart(2, '0');
+    const prefijo = `${fecha.getFullYear()}-${p(fecha.getMonth() + 1)}-${p(fecha.getDate())}_${p(fecha.getHours())}.${p(fecha.getMinutes())}.${p(fecha.getSeconds())}_${id.slice(-6)}`;
+    for (const { nombre } of meta.archivos) {
+      if (nombre === 'miniatura.jpg' || !fs.existsSync(path.join(dir, nombre))) continue;
+      const tipo = nombre === 'recuerdo.jpg' ? 'recuerdo' : tipoDeArchivo(nombre);
+      entradas.push({ nombre: `${eventoSlug}/${carpetas[tipo]}/${prefijo}_${nombre}`, ruta: path.join(dir, nombre), fecha });
+    }
+  }
+  if (!entradas.length) throw Object.assign(new Error('Este evento todavía no tiene fotos'), { codigo: 404 });
+  const carpeta = path.join(DATOS, 'exportaciones');
+  await fsp.mkdir(carpeta, { recursive: true });
+  const hoy = new Date();
+  const destino = path.join(carpeta, `${eventoSlug}-${hoy.toISOString().slice(0, 10)}-${String(hoy.getHours()).padStart(2, '0')}${String(hoy.getMinutes()).padStart(2, '0')}.zip`);
+  const bytes = await crearZip(destino, entradas);
+  return { destino, bytes, archivos: entradas.length, sesiones: lista.length };
+}
 
 // ---------------------------------------------------------------- página de descarga
 
@@ -560,7 +972,7 @@ function paginaGaleria(config, id, sesion) {
   // la principal primero, luego animaciones y videos, y al final las fotos sueltas
   const peso = { gif: 0, video: 1, foto: 2 };
   const resto = meta.archivos.map((a) => a.nombre)
-    .filter((n) => n !== meta.principal)
+    .filter((n) => n !== meta.principal && !ARCHIVOS_INTERNOS.has(n))
     .sort((a, b) => peso[tipoDeArchivo(a)] - peso[tipoDeArchivo(b)] || a.localeCompare(b));
   const orden = [meta.principal, ...resto]
     .filter((n, i, arr) => n && arr.indexOf(n) === i && meta.archivos.some((a) => a.nombre === n));
@@ -572,8 +984,10 @@ function paginaGaleria(config, id, sesion) {
       ? `<video src="${url}" controls playsinline loop muted autoplay preload="metadata"></video>`
       : `<img src="${url}" alt="Recuerdo ${i + 1}" loading="${i === 0 ? 'eager' : 'lazy'}">`;
     const etiqueta = { foto: 'Descargar foto', gif: 'Descargar GIF', video: 'Descargar video' }[tipo];
+    const archivoDescarga = `${slug(marca.nombre)}-${nombre}`;
     return `<figure class="${i === 0 ? 'principal' : ''}">${medio}
-      <a class="boton" href="${url}?descargar=1" download="${escaparHtml(`${slug(marca.nombre)}-${nombre}`)}">${etiqueta}</a></figure>`;
+      <div class="botones"><a class="boton" href="${url}?descargar=1" download="${escaparHtml(archivoDescarga)}">${etiqueta}</a>
+      <button class="boton compartir" type="button" data-url="${url}" data-nombre="${escaparHtml(archivoDescarga)}" hidden>Compartir</button></div></figure>`;
   }).join('\n');
 
   // fondo claro u oscuro según el color de la marca; el logo se elige para que contraste
@@ -610,6 +1024,10 @@ function paginaGaleria(config, id, sesion) {
   .boton { display: block; margin-top: 12px; text-align: center; padding: 14px; border-radius: 999px; font-weight: 700; color: #fff; text-decoration: none;
     background: ${claro ? 'linear-gradient(135deg, color-mix(in srgb, var(--secundario) 85%, #fff), var(--secundario))' : 'linear-gradient(90deg, var(--primario), var(--secundario))'}; }
   .ayuda { text-align: center; font-size: 14px; opacity: .7; padding: 4px 16px 32px; }
+  .botones { display: flex; gap: 10px; }
+  .botones .boton { flex: 1; border: 0; font: inherit; font-weight: 700; cursor: pointer; }
+  .botones .compartir { flex: 0 0 auto; padding-inline: 20px; background: var(--primario); color: ${esColorClaro(marca.colorPrimario) ? '#2b2622' : '#fff'}; }
+  [hidden] { display: none !important; }
 </style>
 </head>
 <body>
@@ -622,6 +1040,21 @@ function paginaGaleria(config, id, sesion) {
 ${tarjetas}
 </main>
 <p class="ayuda">¿No se descarga? Mantén presionada la foto y elige “Guardar imagen”.</p>
+<script>
+  // compartir directo a WhatsApp, Instagram… (sólo en celulares que lo permiten)
+  for (const b of document.querySelectorAll('.compartir')) {
+    if (!navigator.canShare) continue;
+    b.hidden = false;
+    b.addEventListener('click', async () => {
+      try {
+        const blob = await (await fetch(b.dataset.url)).blob();
+        const archivo = new File([blob], b.dataset.nombre, { type: blob.type });
+        if (navigator.canShare({ files: [archivo] })) await navigator.share({ files: [archivo] });
+        else await navigator.share({ url: location.href });
+      } catch (e) { /* el invitado canceló */ }
+    });
+  }
+</script>
 </body>
 </html>`;
 }
@@ -735,10 +1168,71 @@ async function manejarApi(req, res, metodo, partes, url) {
   if (recurso === 'config') {
     if (metodo === 'GET') return enviarJSON(res, 200, leerConfig());
     if (metodo === 'PUT') {
+      const antes = leerConfig();
       const config = guardarConfig(await leerJSON(req));
       log('Configuración guardada');
+      aplicarCambioInternet(antes, config);
+      if (nubeLista(config)) reintentarNube(); // quizá se corrigió el cloud name o el preset
       return enviarJSON(res, 200, config);
     }
+  }
+
+  // ---- panel "Estado": todo lo que hay que revisar antes y durante el evento
+  if (recurso === 'estado-sistema' && metodo === 'GET') {
+    const config = leerConfig();
+    const eventoSlug = slug(config.evento.nombre);
+    let sesionesEvento = 0;
+    for (const { meta } of sesiones.values()) if (meta.eventoSlug === eventoSlug) sesionesEvento++;
+    return enviarJSON(res, 200, {
+      impresora: await consultarImpresora(),
+      disco: espacioEnDisco(),
+      camara: estadoCamara,
+      tunel: {
+        estado: tunel.estado,
+        detalle: tunel.detalle,
+        url: enlaceVerificado() ? tunel.url : '',
+        verificadoHace: tunel.verificado ? Math.round((Date.now() - tunel.verificado) / 1000) : null,
+      },
+      nube: resumenNube(config),
+      papel: { ...leerPapel(), controlar: Boolean(config.impresion.controlarPapel), aviso: config.impresion.avisoPapel },
+      sesiones: { total: sesiones.size, evento: sesionesEvento },
+      arrancado: INICIO,
+    });
+  }
+
+  if (recurso === 'papel') {
+    if (metodo === 'GET') return enviarJSON(res, 200, leerPapel());
+    if (metodo === 'PUT') {
+      const { restante } = await leerJSON(req);
+      const n = Math.max(0, Math.min(100000, Math.round(Number(restante) || 0)));
+      log(`Papel cargado: ${n} hojas`);
+      return enviarJSON(res, 200, guardarPapel({ restante: n, cargado: n }));
+    }
+  }
+
+  // abre un enlace por internet nuevo (por si el actual dejó de funcionar)
+  if (recurso === 'tunel' && id === 'reiniciar' && metodo === 'POST') {
+    if (leerConfig().compartir.internet === false) return enviarError(res, 400, 'El QR por internet está apagado en los ajustes');
+    log('Renovando el enlace por internet (pedido desde los ajustes)');
+    Object.assign(tunel, { estado: 'reconectando', detalle: 'Renovando el enlace…', intentos: 0 });
+    if (tunel.proceso) {
+      tunel.reiniciando = true;
+      tunel.proceso.kill();
+    } else {
+      iniciarTunel();
+    }
+    return enviarJSON(res, 200, { ok: true });
+  }
+
+  // guarda todo el evento en un ZIP ordenado (para entregarlo al cliente)
+  if (recurso === 'exportar' && metodo === 'POST') {
+    const cuerpo = await leerJSON(req);
+    const eventoSlug = cuerpo.evento ? slug(cuerpo.evento) : slug(leerConfig().evento.nombre);
+    log(`Exportando el evento ${eventoSlug}…`);
+    const r = await exportarEvento(eventoSlug);
+    log(`Evento exportado: ${r.destino} (${r.archivos} archivos)`);
+    if (process.platform === 'win32') spawn('explorer.exe', ['/select,', r.destino], { detached: true, stdio: 'ignore' }).unref();
+    return enviarJSON(res, 200, { ...r, archivo: path.basename(r.destino) });
   }
 
   // estado de la cámara que reporta la cabina (para diagnosticar problemas)
@@ -867,16 +1361,20 @@ async function manejarApi(req, res, metodo, partes, url) {
 
   if (recurso === 'nube') {
     // estado de la subida a internet (para los ajustes)
-    if (metodo === 'GET' && id === 'estado') {
-      let guardadas = 0;
-      let pendientes = 0;
-      let sinSubir = 0;
-      for (const { meta } of sesiones.values()) {
-        if (meta.nube?.completo) guardadas++;
-        else if (meta.nube) pendientes++;
-        else sinSubir++;
+    if (metodo === 'GET' && id === 'estado') return enviarJSON(res, 200, resumenNube(leerConfig()));
+
+    // prueba con los datos escritos en los ajustes (aunque todavía no se guarden)
+    if (metodo === 'POST' && id === 'probar') {
+      try {
+        return enviarJSON(res, 200, await probarNube(await leerJSON(req)));
+      } catch (err) {
+        return enviarJSON(res, 200, { ok: false, error: err.message });
       }
-      return enviarJSON(res, 200, { activa: nubeLista(leerConfig()), guardadas, pendientes, sinSubir, ...estadoNube, enCola: colaNube.length });
+    }
+
+    if (metodo === 'POST' && id === 'reintentar') {
+      reintentarNube();
+      return enviarJSON(res, 200, { enCola: colaNube.length });
     }
     // guardar en internet también las sesiones anteriores (todas las de todos los eventos)
     if (metodo === 'POST' && id === 'subir-anteriores') {
@@ -887,6 +1385,8 @@ async function manejarApi(req, res, metodo, partes, url) {
       for (const [sid, sesion] of lista) {
         if (sesion.meta.nube?.completo) continue;
         prepararEnNube(config, sid, sesion);
+        sesion.meta.nube.proximo = 0;
+        encolarNube(sid);
         await guardarMeta(sesion);
         nuevas++;
       }
@@ -951,9 +1451,21 @@ async function manejarApi(req, res, metodo, partes, url) {
       await escribirAtomico(path.join(sesion.dir, extra), datos);
       sesion.meta.archivos = sesion.meta.archivos.filter((a) => a.nombre !== extra);
       sesion.meta.archivos.push({ nombre: extra, tipo: tipoDeArchivo(extra), bytes: datos.length });
-      if (!sesion.meta.principal) sesion.meta.principal = extra;
+      if (!sesion.meta.principal && !ARCHIVOS_INTERNOS.has(extra)) sesion.meta.principal = extra;
       await guardarMeta(sesion);
       return enviarJSON(res, 200, { ok: true, bytes: datos.length });
+    }
+
+    // Antes de armar la impresión: reserva el enlace permanente con los archivos que
+    // se van a guardar, para poder imprimir el QR en la foto misma.
+    if (metodo === 'POST' && extra === 'reservar') {
+      const config = leerConfig();
+      if (!nubeLista(config)) return enviarJSON(res, 200, { permanente: false });
+      const { archivos } = await leerJSON(req);
+      const nombres = (Array.isArray(archivos) ? archivos : []).filter((n) => ARCHIVO_VALIDO.test(n));
+      const enlace = prepararEnNube(config, id, sesion, nombres);
+      await guardarMeta(sesion);
+      return enviarJSON(res, 200, { permanente: Boolean(enlace), url: enlace });
     }
 
     // la cabina terminó de subir los archivos: si hay nube, se guarda en internet y
@@ -962,17 +1474,22 @@ async function manejarApi(req, res, metodo, partes, url) {
       const config = leerConfig();
       if (!nubeLista(config)) return enviarJSON(res, 200, { permanente: false });
       const enlace = prepararEnNube(config, id, sesion);
+      sesion.meta.nube.proximo = 0;
+      encolarNube(id, true);
       await guardarMeta(sesion);
       procesarColaNube();
       return enviarJSON(res, 200, { permanente: Boolean(enlace), url: enlace });
     }
 
-    // registrar impresiones
+    // registrar impresiones (y descontar el papel)
     if (metodo === 'POST' && extra === 'impresiones') {
       const { copias } = await leerJSON(req);
-      sesion.meta.impresiones = (sesion.meta.impresiones || 0) + Math.max(1, Math.min(Number(copias) || 1, 20));
+      const n = Math.max(1, Math.min(Number(copias) || 1, 20));
+      sesion.meta.impresiones = (sesion.meta.impresiones || 0) + n;
       await guardarMeta(sesion);
-      return enviarJSON(res, 200, { impresiones: sesion.meta.impresiones });
+      let papel = leerPapel();
+      if (leerConfig().impresion.controlarPapel) papel = guardarPapel({ ...papel, restante: Math.max(0, papel.restante - n) });
+      return enviarJSON(res, 200, { impresiones: sesion.meta.impresiones, papel });
     }
 
     // eliminar (se mueve a la papelera, no se borra)
@@ -980,6 +1497,7 @@ async function manejarApi(req, res, metodo, partes, url) {
       const destino = path.join(PAPELERA, `${sesion.meta.eventoSlug}__${id}`);
       await moverConReintentos(sesion.dir, destino);
       sesiones.delete(id);
+      if (colaNube.includes(id)) colaNube.splice(colaNube.indexOf(id), 1);
       log(`Sesión ${id} enviada a la papelera`);
       return enviarJSON(res, 200, { ok: true });
     }
@@ -1076,6 +1594,22 @@ function iniciarTunel() {
     log(`Enlace por internet caído; reintento en ${espera} s`);
     setTimeout(iniciarTunel, espera * 1000);
   });
+}
+
+/** Prende o apaga el enlace por internet al momento, sin reiniciar el programa. */
+function aplicarCambioInternet(antes, despues) {
+  const estabaPrendido = antes.compartir.internet !== false;
+  const quedaPrendido = despues.compartir.internet !== false;
+  if (estabaPrendido === quedaPrendido) return;
+  if (!quedaPrendido) {
+    log('QR por internet apagado desde los ajustes');
+    Object.assign(tunel, { estado: 'apagado', url: '', detalle: 'Desactivado en los ajustes' });
+    tunel.proceso?.kill();
+  } else if (!tunel.proceso) {
+    log('QR por internet encendido desde los ajustes');
+    tunel.intentos = 0;
+    iniciarTunel();
+  }
 }
 
 function cerrarTunel() {
@@ -1181,9 +1715,11 @@ process.on('exit', cerrarTunel);
 
 indexarSesiones();
 
-// sesiones que quedaron a medio subir la última vez: se retoman solas
-for (const [id, { meta }] of sesiones) {
-  if (meta.nube && !meta.nube.completo) colaNube.push(id);
+// sesiones que quedaron a medio subir la última vez: se retoman solas (las más recientes primero)
+for (const [id, { meta }] of [...sesiones].sort((a, b) => (a[0] < b[0] ? 1 : -1))) {
+  if (!meta.nube || meta.nube.completo) continue;
+  meta.nube.proximo = 0;
+  colaNube.push(id);
 }
 if (colaNube.length) setTimeout(procesarColaNube, 5000);
 

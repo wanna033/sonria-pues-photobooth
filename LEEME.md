@@ -76,7 +76,13 @@ misma proporción que la cámara (3:2 o 16:9) para que no se recorten caras.
 | **Stickers** | Emojis y frases personalizadas que se arrastran, giran y cambian de tamaño (también con dos dedos). |
 | **Repetir fotos** | El invitado puede repetir una foto o todas antes de imprimir. |
 | **Impresión** | Hasta N copias por sesión, en la impresora predeterminada de Windows (10×15 cm / 4×6"). |
-| **Código QR** | Los invitados escanean y descargan sus fotos, GIF o video desde el celular (misma red Wi-Fi). |
+| **Código QR** | Los invitados escanean y descargan sus fotos, GIF o video desde el celular, con datos móviles o cualquier Wi-Fi. Con Cloudinary, el QR funciona **para siempre**. |
+| **QR impreso en la foto** | Opcional: cada tira lleva un QR de ~2 cm para descargar las fotos días después. |
+| **Galería del evento** | Un solo QR / enlace con TODAS las fotos del evento, para el cliente o en una esquina del inicio. |
+| **Compartir** | En la página de descarga, botón para enviar la foto directo a WhatsApp, Instagram, etc. |
+| **Pestaña Estado** | Revisión antes del evento: cámara, impresora (y sus errores: sin papel, atasco…), papel, QR por internet, fotos en la nube y disco. |
+| **Contador de papel** | Descuenta una hoja por copia, avisa cuando queda poco y deja de ofrecer imprimir cuando se acaba. |
+| **Exportar evento (ZIP)** | Un archivo ordenado (impresiones, GIF y boomerang, videos, fotos) para entregar al cliente. |
 | **Tu marca** | Nombre, frase, 3 colores, logotipo, fondo e imagen de fondo personalizados. |
 | **Asistente** | Cuenta regresiva con pitidos, obturador, destello y voz en español. |
 | **Pantalla de inicio** | Muestra un collage con las últimas fotos del evento. |
@@ -99,7 +105,9 @@ Casi todo se cambia desde los **Ajustes**, sin tocar el código:
 | Plantillas activas, fondo, tipografía, filtros | Ajustes → Diseño |
 | Frases y **emojis** de los stickers | Ajustes → Diseño |
 | Tus tiras y postales, y el tamaño de la hoja impresa | Ajustes → Mis diseños |
-| Copias, prueba de impresión, dirección del QR | Ajustes → Impresión y QR |
+| Copias, prueba de impresión, papel, dirección del QR | Ajustes → Impresión y QR |
+| Guardar fotos en internet (QR permanentes), QR impreso, galería del evento | Ajustes → Impresión y QR |
+| Revisar que todo funcione, cargar papel, exportar el evento | Ajustes → **Estado** |
 | PIN, tiempos de inactividad, fotos recientes en el inicio | Ajustes → General |
 
 En los textos, lo que va entre llaves se reemplaza solo: `{n}`, `{total}`, `{segundos}`,
@@ -134,34 +142,58 @@ cualquier Wi-Fi**. En la pantalla final el QR dice "(funciona con tus datos móv
 - **Se vigila solo:** cada 30 segundos la cabina comprueba desde internet que el enlace
   responda. Si Cloudflare lo da de baja o se cae, abre uno nuevo en unos 15 segundos, y
   **nunca pone en un QR un enlace sin comprobar** (mientras tanto usa el Wi-Fi del evento).
-- Su estado se ve en *Ajustes → Impresión y QR*, donde también se puede apagar.
+- Su estado se ve en *Ajustes → Estado* y en *Impresión y QR*, donde se puede apagar (al momento,
+  sin reiniciar) o pedir un enlace nuevo con **🔄 Renovar enlace**.
 - Usa el programa `herramientas\cloudflared.exe`. Si falta (por ejemplo, si descargaste el
   proyecto de GitHub), doble clic en **`Activar QR por internet.bat`** una sola vez.
 
-## Opcional: guardar las fotos en la nube (Cloudinary)
+## QR que funcionan siempre: fotos guardadas en internet (Cloudinary)
 
 Con el enlace automático, las fotos se descargan de la computadora mientras está encendida.
-Si quieres que los enlaces sigan funcionando **después del evento, con la computadora
-apagada**, la cabina puede subir cada sesión a **Cloudinary** (plan gratuito). En ese caso
-el QR abre tu página de descarga publicada en GitHub Pages.
+Para que los QR sigan funcionando **después del evento, con la computadora apagada**, la
+cabina sube cada sesión a **Cloudinary** (plan gratuito) y el QR abre tu página de descarga
+en GitHub Pages con un **enlace fijo**.
 
 Se configura una sola vez, en *Ajustes → Impresión y QR*:
 
 1. Crea una cuenta gratis en [cloudinary.com](https://cloudinary.com) y copia tu **Cloud name**.
-2. En *Settings → Upload → Upload presets*, crea un preset con **Signing Mode: Unsigned** y copia su nombre.
-3. Pega los dos datos en los ajustes, escribe la dirección de tu página de descarga
-   (por ejemplo `https://tuusuario.github.io/sonria-pues-photobooth/g`) y activa
-   **"Subir cada sesión a internet"**.
-4. Pulsa **"Probar la conexión con la nube"**.
+2. En *Settings → Upload → Upload presets*, crea un preset con **Signing Mode: Unsigned**
+   (deja vacío "Folder") y copia su nombre.
+3. Pega los dos datos en los ajustes, activa **"Guardar cada sesión en internet"** y pulsa
+   **"Probar la conexión con la nube"**: sube una imagen de prueba, comprueba que se vea desde
+   cualquier celular y te dice exactamente qué corregir si algo falla.
+4. (Opcional, para la galería de todo el evento) En *Settings → Security → Restricted media
+   types* desmarca **Resource list** y guarda.
+5. En *Ajustes → Galería*, **"☁️ Guardar en internet las N sesiones anteriores"** sube también
+   lo que ya tenías.
 
-Ninguno de esos dos datos es una clave secreta. Ten en cuenta dos cosas:
+Cómo funciona:
 
-- Las fotos quedan alojadas en internet y **cualquiera con el enlace puede verlas**.
-- Si en el evento no hay internet, la subida falla sin romper nada: el QR vuelve
-  automáticamente a la dirección de la red local.
+- El QR sale **al instante**; la subida sigue en segundo plano. Si el invitado escanea antes de
+  que termine, su celular muestra "Tus fotos se están subiendo…" y aparecen solas.
+- **Sin internet en el evento no se pierde nada:** cada sesión queda en fila y se sube sola
+  cuando vuelve la conexión (se revisa cada 15 segundos). Una sesión con problemas no detiene
+  a las demás, y la del invitado que está esperando siempre va primero.
+- Un boomerang muy pesado (más de 10 MB, el límite del plan gratis) se guarda como video y la
+  página lo muestra igual.
+- Si cambias de cuenta de Cloudinary, lo pendiente se sube a la cuenta nueva.
+- Ninguno de los dos datos es una clave secreta. Las fotos quedan en internet: **cualquiera con
+  el enlace de una sesión puede verla**, pero nadie puede ver la lista de todas (la galería del
+  evento usa un código secreto propio de cada evento).
+- Por defecto sólo se suben la tira, el GIF y el video (no las fotos sueltas), para que la
+  espera sea corta y el código QR sencillo.
 
-Por defecto sólo se suben la tira, el GIF y el video (no las fotos sueltas), para que la
-espera sea corta y el código QR sencillo.
+### QR impreso en la foto
+
+Con las fotos en internet, activa **"Imprimir el código QR en la foto"**: cada tira o postal
+lleva un QR pequeño (unos 2 cm) en la esquina que elijas. El enlace se reserva antes de
+imprimir, así que funciona aunque la subida termine después.
+
+### Galería de todo el evento
+
+En *Ajustes → Galería* aparece el QR y el enlace con **todas** las fotos del evento, para
+compartirlo con el cliente. También puedes mostrarlo en una esquina del inicio
+(**"QR de la galería del evento en el inicio"**).
 
 ## La versión web (misma cabina en el navegador)
 
@@ -209,6 +241,16 @@ Canon (*EOS Webcam Utility*), Nikon (*Webcam Utility*), Sony (*Imaging Edge Webc
 (*X Webcam*) convierten tu cámara en webcam. Instala la utilidad, conecta por USB y elígela en
 *Ajustes → Cámara*. Sin cámara, la cabina usa una **cámara de demostración** para que puedas probarla.
 
+## Antes de cada evento
+
+1. Abre *Ajustes → **Estado***: todo debe estar en ✅ (cámara, impresora, QR por internet, fotos
+   en internet y espacio en disco).
+2. Si llevas la cuenta del papel, escribe cuántas hojas cargaste y pulsa **🧻 Cargué papel**.
+3. Imprime la **página de prueba** y escanea un QR con **datos móviles** (no con el Wi-Fi).
+
+Al terminar, **📦 Exportar evento (ZIP)** arma un archivo con carpetas `impresiones`,
+`gif-y-boomerang`, `videos` y `fotos-individuales` (queda en `datos\exportaciones`).
+
 ## Dónde quedan las fotos
 
 ```
@@ -217,6 +259,7 @@ Sonria PJs\datos\fotos\<nombre-del-evento>\<sesión>\
     foto-1.jpg …      ← cada foto en resolución completa
     animacion.gif     ← GIF (modo GIF, o también en modo Fotos)
     boomerang.gif / video.mp4
+    miniatura.jpg     ← vista chica para la galería (uso interno)
 ```
 
 Lo que quitas desde la galería se mueve a `datos\papelera` (no se borra).
@@ -241,6 +284,5 @@ Lo que quitas desde la galería se mueve a `datos\papelera` (no se borra).
 ## Ideas para después
 
 - Envío por correo o WhatsApp (requiere internet y una cuenta de un servicio de envío).
-- Galería en línea para compartir fuera del Wi-Fi del evento.
 - Pantalla verde / quitar el fondo.
 - Control directo de cámaras réflex (disparo a resolución completa de la cámara).

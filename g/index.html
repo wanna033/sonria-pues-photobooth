@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Sonría Pues · Tus fotos</title>
 <meta name="theme-color" content="#fffdf8">
+<meta name="robots" content="noindex">
 <link rel="icon" href="../public/marca/icono.png" type="image/png">
 <style>
   :root { --primario: #d6a545; --secundario: #184659; --fondo: #fffdf8; --texto: #2e2821; }
@@ -16,6 +17,7 @@
     color: var(--texto);
     background: radial-gradient(120% 60% at 50% 0%, color-mix(in srgb, var(--primario) 18%, var(--fondo)) 0%, var(--fondo) 70%) fixed;
   }
+  [hidden] { display: none !important; }
   header { text-align: center; padding: 26px 16px 6px; }
   header img { max-height: 130px; max-width: 78%; }
   header p { margin: 8px 0 0; font-weight: 600; }
@@ -29,7 +31,6 @@
     box-shadow: 0 10px 30px rgba(60, 45, 20, 0.12);
   }
   figure img, figure video { width: 100%; display: block; border-radius: 10px; background: #000; }
-  figure img[hidden], figure video[hidden], .boton[hidden] { display: none; }
   .subiendo {
     display: grid;
     place-items: center;
@@ -40,60 +41,79 @@
     background: color-mix(in srgb, var(--primario) 10%, #fff);
     text-align: center;
   }
-  .subiendo[hidden] { display: none; }
   .rueda { width: 42px; height: 42px; border-radius: 50%; border: 4px solid color-mix(in srgb, var(--primario) 30%, transparent); border-top-color: var(--primario); animation: girar 1s linear infinite; }
   @keyframes girar { to { transform: rotate(1turn); } }
+  .botones { display: flex; gap: 10px; margin-top: 12px; }
   .boton {
+    flex: 1;
     display: block;
-    margin-top: 12px;
     padding: 14px;
+    border: 0;
     border-radius: 999px;
     text-align: center;
+    font: inherit;
     font-weight: 700;
     color: #fff;
     text-decoration: none;
+    cursor: pointer;
     background: linear-gradient(135deg, color-mix(in srgb, var(--secundario) 85%, #fff), var(--secundario));
   }
+  .boton.compartir { flex: 0 0 auto; padding-inline: 20px; background: var(--primario); color: #2e2821; }
   .ayuda { text-align: center; font-size: 14px; opacity: .72; padding: 4px 16px 36px; }
   .vacio { text-align: center; padding: 40px 20px; }
+  .volver { display: inline-block; margin-top: 10px; color: var(--secundario); font-weight: 700; text-decoration: none; }
+
+  /* galería de todo el evento */
+  .evento { max-width: 1100px; }
+  .rejilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .rejilla a { display: block; aspect-ratio: 3 / 4; border-radius: 12px; overflow: hidden; background: #eee; box-shadow: 0 4px 14px rgba(60, 45, 20, 0.12); }
+  .rejilla img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .contador { text-align: center; margin: 0; opacity: .75; }
 </style>
 </head>
 <body>
 <header>
   <img src="../public/marca/logo.png" alt="Sonría Pues Photobooth">
   <p id="evento"></p>
+  <a class="volver" id="volver" hidden>← Ver todas las fotos del evento</a>
 </header>
 <main id="galeria"></main>
-<p class="ayuda">¿No se descarga? Mantén presionada la foto y elige “Guardar imagen”.</p>
+<p class="ayuda" id="ayuda">¿No se descarga? Mantén presionada la foto y elige “Guardar imagen”.</p>
 
 <script type="module">
   import { leerEnlace, urlDeArchivo } from '../public/js/nube.js';
 
   const galeria = document.getElementById('galeria');
+  const parametros = new URLSearchParams(location.search);
+  const CUENTA = /^[a-z0-9_-]{1,80}$/i;
+  const SESION = /^[0-9]{8}-[0-9]{6}-[0-9a-f]{6,16}$/;
+  const ETIQUETA = /^sonria_[a-z0-9_-]{1,90}$/;
   const etiquetas = { jpg: 'Descargar foto', png: 'Descargar foto', gif: 'Descargar GIF', mp4: 'Descargar video', webm: 'Descargar video' };
+  // cada letra del enlace es un archivo de la sesión
+  const NOMBRES = { r: ['recuerdo', 'jpg', 'image'], a: ['animacion', 'gif', 'image'], b: ['boomerang', 'gif', 'image'], v: ['video', 'mp4', 'video'], w: ['video', 'mp4', 'video'] };
+  const PRIORIDAD = ['recuerdo', 'animacion', 'boomerang', 'video'];
+
+  const nube = (cuenta, tipo, ruta, transformacion = '') =>
+    `https://res.cloudinary.com/${cuenta}/${tipo}/upload/${transformacion ? `${transformacion}/` : ''}${ruta}`;
 
   /**
    * Enlace permanente de la cabina: ?c=<cuenta>&s=<sesión>&a=<archivos>
-   * Cada letra es un archivo: r = recuerdo, a = GIF, b = boomerang, v/w = video, 1-9 = fotos.
+   * Un GIF muy pesado se guarda como video: por eso los GIF tienen una segunda opción en MP4.
    */
   function leerEnlacePermanente() {
-    const p = new URLSearchParams(location.search);
-    const cuenta = p.get('c') || '';
-    const sesion = p.get('s') || '';
-    const codigos = p.get('a') || 'r';
-    if (!/^[a-z0-9_-]{1,80}$/i.test(cuenta) || !/^[0-9]{8}-[0-9]{6}-[0-9a-f]{6,16}$/.test(sesion)) return null;
-    const nombres = { r: ['recuerdo', 'jpg', 'image'], a: ['animacion', 'gif', 'image'], b: ['boomerang', 'gif', 'image'], v: ['video', 'mp4', 'video'], w: ['video', 'mp4', 'video'] };
+    const cuenta = parametros.get('c') || '';
+    const sesion = parametros.get('s') || '';
+    if (!CUENTA.test(cuenta) || !SESION.test(sesion)) return null;
     const archivos = [];
-    for (const c of codigos) {
-      const [base, formato, tipo] = nombres[c] || (/^[1-9]$/.test(c) ? [`foto-${c}`, 'jpg', 'image'] : []);
+    for (const c of parametros.get('a') || 'r') {
+      const [base, formato, tipo] = NOMBRES[c] || (/^[1-9]$/.test(c) ? [`foto-${c}`, 'jpg', 'image'] : []);
       if (!base) continue;
-      const ruta = `sonria/${sesion}/${base}.${formato}`;
-      archivos.push({
-        tipo,
-        formato,
-        url: `https://res.cloudinary.com/${cuenta}/${tipo}/upload/${ruta}`,
-        descarga: `https://res.cloudinary.com/${cuenta}/${tipo}/upload/fl_attachment/${ruta}`,
-      });
+      const ruta = `sonria/${sesion}/${base}`;
+      const opciones = [{ tipo, formato, url: nube(cuenta, tipo, `${ruta}.${formato}`), descarga: nube(cuenta, tipo, `${ruta}.${formato}`, 'fl_attachment') }];
+      if (formato === 'gif') {
+        opciones.push({ tipo: 'video', formato: 'mp4', url: nube(cuenta, 'video', `${ruta}.mp4`), descarga: nube(cuenta, 'video', `${ruta}.mp4`, 'fl_attachment') });
+      }
+      archivos.push({ nombre: `sonria-pues-${base}`, opciones });
     }
     return archivos.length ? archivos : null;
   }
@@ -104,59 +124,184 @@
     if (!datos?.a?.length) return null;
     document.getElementById('evento').textContent = datos.e || '';
     return datos.a.map((a) => ({
-      tipo: a.tipo === 'v' ? 'video' : 'image',
-      formato: a.formato,
-      url: urlDeArchivo(datos.c, a),
-      descarga: urlDeArchivo(datos.c, a, true),
+      nombre: `sonria-pues-${a.n || 'recuerdo'}`,
+      opciones: [{ tipo: a.tipo === 'v' ? 'video' : 'image', formato: a.formato, url: urlDeArchivo(datos.c, a), descarga: urlDeArchivo(datos.c, a, true) }],
     }));
   }
 
-  /** Muestra el archivo; si todavía se está subiendo, avisa y reintenta solo. */
+  /** Mientras la cabina sube las fotos, se reintenta solo; si tarda mucho, se explica por qué. */
+  const cargadas = new Set();
+  const esperando = new Set();
+
   function mostrar(archivo) {
     const figura = document.createElement('figure');
     const espera = document.createElement('div');
     espera.className = 'subiendo';
     espera.hidden = true;
-    espera.innerHTML = '<div class="rueda"></div><strong>Tus fotos se están subiendo…</strong><span>En cuanto estén listas aparecen aquí solas. No cierres esta página.</span>';
+    espera.innerHTML = '<div class="rueda"></div><strong>Tus fotos se están subiendo…</strong><span class="explicacion">En cuanto estén listas aparecen aquí solas. No cierres esta página.</span>';
 
-    const medio = document.createElement(archivo.tipo === 'video' ? 'video' : 'img');
-    if (archivo.tipo === 'video') Object.assign(medio, { controls: true, playsInline: true, loop: true, muted: true, autoplay: true, preload: 'metadata' });
-    else medio.alt = 'Tu recuerdo';
-
-    const boton = document.createElement('a');
-    boton.className = 'boton';
-    boton.href = archivo.descarga;
-    boton.textContent = etiquetas[archivo.formato] || 'Descargar';
-    boton.hidden = true;
+    const botones = document.createElement('div');
+    botones.className = 'botones';
+    botones.hidden = true;
+    const descargar = document.createElement('a');
+    descargar.className = 'boton';
+    const compartir = document.createElement('button');
+    compartir.className = 'boton compartir';
+    compartir.type = 'button';
+    compartir.textContent = 'Compartir';
+    compartir.hidden = !navigator.canShare;
+    botones.append(descargar, compartir);
+    figura.append(espera, botones);
+    galeria.append(figura);
 
     let intento = 0;
-    const cargar = () => {
-      intento += 1;
-      medio.src = intento === 1 ? archivo.url : `${archivo.url}?intento=${intento}`;
+    let opcion = 0;
+    let medio = null;
+    let elegida = null;
+
+    const probar = () => {
+      elegida = archivo.opciones[opcion];
+      medio?.remove();
+      medio = document.createElement(elegida.tipo === 'video' ? 'video' : 'img');
+      if (elegida.tipo === 'video') Object.assign(medio, { controls: true, playsInline: true, loop: true, muted: true, autoplay: true, preload: 'metadata' });
+      else medio.alt = 'Tu recuerdo';
+      medio.hidden = true;
+      medio.addEventListener(elegida.tipo === 'video' ? 'loadeddata' : 'load', listo, { once: true });
+      medio.addEventListener('error', falla, { once: true });
+      medio.src = intento ? `${elegida.url}?intento=${intento}` : elegida.url;
+      figura.insertBefore(medio, botones);
     };
-    const listo = () => {
+    function listo() {
+      cargadas.add(archivo);
+      esperando.delete(archivo);
       espera.hidden = true;
       medio.hidden = false;
-      boton.hidden = false;
-    };
-    const falta = () => {
-      medio.hidden = true;
+      botones.hidden = false;
+      descargar.href = elegida.descarga;
+      descargar.textContent = etiquetas[elegida.formato] || 'Descargar';
+      compartir.onclick = () => compartirArchivo(elegida.url, `${archivo.nombre}.${elegida.formato}`);
+      revisarEspera();
+    }
+    function falla() {
+      // un GIF puede estar guardado como video: se prueba esa opción antes de esperar
+      if (opcion + 1 < archivo.opciones.length) {
+        opcion += 1;
+        return probar();
+      }
+      opcion = 0;
+      intento += 1;
+      esperando.add(archivo);
       espera.hidden = false;
-      setTimeout(cargar, 6000);
-    };
-    medio.addEventListener(archivo.tipo === 'video' ? 'loadeddata' : 'load', listo);
-    medio.addEventListener('error', falta);
-
-    figura.append(espera, medio, boton);
-    galeria.append(figura);
-    cargar();
+      // a los ~3 minutos: si las demás ya llegaron, ésta se quita; si no, se explica y se espera más
+      if (intento > 30 && cargadas.size) {
+        figura.remove();
+        esperando.delete(archivo);
+        return;
+      }
+      revisarEspera();
+      setTimeout(probar, intento > 30 ? 20000 : 6000);
+    }
+    probar();
   }
 
-  const archivos = leerEnlacePermanente() || leerEnlaceWeb();
-  if (!archivos) {
-    galeria.innerHTML = '<p class="vacio">No encontramos estas fotos.<br>Pide en la cabina que te muestren el código QR otra vez.</p>';
+  function revisarEspera() {
+    const larga = [...esperando].length && !cargadas.size;
+    for (const texto of document.querySelectorAll('.explicacion')) {
+      texto.textContent = larga && performance.now() > 180000
+        ? 'Todavía no llegan. La cabina las sube en cuanto tiene internet: deja esta página abierta o vuelve a abrir el enlace más tarde (sigue sirviendo).'
+        : 'En cuanto estén listas aparecen aquí solas. No cierres esta página.';
+    }
+  }
+
+  async function compartirArchivo(url, nombre) {
+    try {
+      const blob = await (await fetch(url)).blob();
+      const archivo = new File([blob], nombre, { type: blob.type });
+      if (navigator.canShare?.({ files: [archivo] })) await navigator.share({ files: [archivo] });
+      else await navigator.share({ url: location.href });
+    } catch { /* el invitado canceló */ }
+  }
+
+  // ---------------------------------------------------------------- galería de todo el evento (?c=&t=)
+
+  async function listar(cuenta, tipo, etiqueta) {
+    const res = await fetch(`https://res.cloudinary.com/${cuenta}/${tipo}/list/${etiqueta}.json?t=${Math.floor(Date.now() / 60000)}`);
+    if (res.status === 404) return [];
+    if (!res.ok) throw Object.assign(new Error('lista'), { estado: res.status });
+    return (await res.json()).resources || [];
+  }
+
+  async function mostrarEvento(cuenta, etiqueta) {
+    galeria.classList.add('evento');
+    document.getElementById('ayuda').textContent = 'Toca una foto para verla en grande y descargarla.';
+    galeria.innerHTML = '<div class="subiendo"><div class="rueda"></div><strong>Cargando las fotos del evento…</strong></div>';
+    let recursos;
+    try {
+      const [imagenes, videos] = await Promise.all([listar(cuenta, 'image', etiqueta), listar(cuenta, 'video', etiqueta).catch(() => [])]);
+      recursos = [...imagenes.map((r) => ({ ...r, tipo: 'image' })), ...videos.map((r) => ({ ...r, tipo: 'video' }))];
+    } catch (err) {
+      galeria.innerHTML = err.estado === 401
+        ? '<p class="vacio">La galería del evento todavía no está activada.<br>Pide a la cabina que active “Resource list” en Cloudinary.</p>'
+        : '<p class="vacio">No se pudo cargar la galería. Revisa tu conexión e inténtalo otra vez.</p>';
+      return;
+    }
+    // se agrupan los archivos por sesión: sonria/<sesión>/<archivo>
+    const sesiones = new Map();
+    for (const r of recursos) {
+      const [, sesion, base] = /^sonria\/([^/]+)\/([^/]+)$/.exec(r.public_id) || [];
+      if (!sesion || !SESION.test(sesion)) continue;
+      if (!sesiones.has(sesion)) sesiones.set(sesion, []);
+      sesiones.get(sesion).push({ ...r, base });
+    }
+    if (!sesiones.size) {
+      galeria.innerHTML = '<p class="vacio">Todavía no hay fotos en la galería.<br>Vuelve en un rato: se agregan solas.</p>';
+      return;
+    }
+    const codigos = { recuerdo: 'r', animacion: 'a', boomerang: 'b', video: 'v' };
+    const rejilla = document.createElement('div');
+    rejilla.className = 'rejilla';
+    const ordenadas = [...sesiones].sort((a, b) => (a[0] < b[0] ? 1 : -1));
+    for (const [sesion, archivos] of ordenadas) {
+      archivos.sort((a, b) => PRIORIDAD.indexOf(a.base) - PRIORIDAD.indexOf(b.base));
+      const principal = archivos.find((a) => PRIORIDAD.includes(a.base)) || archivos[0];
+      const letras = archivos.map((a) => codigos[a.base] || (a.base.match(/^foto-([1-9])$/) || [])[1] || '').join('');
+      const enlace = document.createElement('a');
+      enlace.href = `?c=${encodeURIComponent(cuenta)}&s=${sesion}&a=${letras || 'r'}&t=${encodeURIComponent(etiqueta)}`;
+      const img = document.createElement('img');
+      img.loading = 'lazy';
+      img.alt = '';
+      img.src = principal.tipo === 'video'
+        ? nube(cuenta, 'video', `sonria/${sesion}/${principal.base}.jpg`, 'c_fill,w_400,h_533,so_0')
+        : nube(cuenta, 'image', `sonria/${sesion}/${principal.base}.jpg`, 'c_fill,w_400,h_533,g_auto,q_auto');
+      enlace.append(img);
+      rejilla.append(enlace);
+    }
+    const contador = document.createElement('p');
+    contador.className = 'contador';
+    contador.textContent = `${sesiones.size} ${sesiones.size === 1 ? 'sesión' : 'sesiones'}`;
+    galeria.replaceChildren(contador, rejilla);
+  }
+
+  // ---------------------------------------------------------------- arranque
+
+  const cuenta = parametros.get('c') || '';
+  const etiqueta = parametros.get('t') || '';
+  const tieneEvento = CUENTA.test(cuenta) && ETIQUETA.test(etiqueta);
+
+  if (tieneEvento && !parametros.get('s')) {
+    mostrarEvento(cuenta, etiqueta);
   } else {
-    archivos.forEach(mostrar);
+    const archivos = leerEnlacePermanente() || leerEnlaceWeb();
+    if (tieneEvento) {
+      const volver = document.getElementById('volver');
+      volver.href = `?c=${encodeURIComponent(cuenta)}&t=${encodeURIComponent(etiqueta)}`;
+      volver.hidden = false;
+    }
+    if (!archivos) {
+      galeria.innerHTML = '<p class="vacio">No encontramos estas fotos.<br>Pide en la cabina que te muestren el código QR otra vez.</p>';
+    } else {
+      archivos.forEach(mostrar);
+    }
   }
 </script>
 </body>

@@ -10,6 +10,7 @@ import { GRUPOS_TEXTOS } from './textos.js';
 import { EditorDisenos } from './disenos.js';
 
 const SECCIONES = [
+  { id: 'estado', titulo: 'Estado', especial: 'estado' },
   {
     id: 'evento',
     titulo: 'Evento y marca',
@@ -109,9 +110,13 @@ const SECCIONES = [
       { ruta: 'impresion.copiasMaximas', tipo: 'numero', min: 1, max: 10, etiqueta: 'Copias máximas por sesión' },
       { ruta: 'impresion.copiasPorDefecto', tipo: 'numero', min: 1, max: 10, etiqueta: 'Copias sugeridas' },
       { tipo: 'accion', etiqueta: 'Prueba', boton: '🖨️ Imprimir página de prueba', accion: 'imprimirPrueba', ayuda: 'Imprime la plantilla predeterminada en la impresora predeterminada de Windows. La hoja mide exactamente lo que la plantilla (las integradas, 10×15 cm; las tuyas, lo que indiques en "Mis diseños"). Pon ese mismo tamaño de papel en la impresora y sin bordes.' },
+      { h: 'Papel' },
+      { ruta: 'impresion.controlarPapel', tipo: 'bool', etiqueta: 'Llevar la cuenta del papel', ayuda: 'Descuenta una hoja por cada copia impresa, avisa en el inicio cuando queda poco y deja de ofrecer la impresión cuando se acaba (el QR sigue funcionando).' },
+      { ruta: 'impresion.avisoPapel', tipo: 'numero', min: 0, max: 500, etiqueta: 'Avisar cuando queden (hojas)' },
+      { tipo: 'papel' },
       { h: 'Descarga con código QR' },
       { ruta: 'compartir.qr', tipo: 'bool', etiqueta: 'Mostrar código QR' },
-      { ruta: 'compartir.internet', tipo: 'bool', etiqueta: 'QR por internet (datos móviles y cualquier Wi-Fi)', ayuda: 'Abre solo un enlace seguro de Cloudflare, gratis y sin cuenta. Por ese enlace sólo se ven las fotos de cada sesión. Si no hay internet, el QR usa el Wi-Fi del evento. Los cambios se aplican al volver a abrir el programa.' },
+      { ruta: 'compartir.internet', tipo: 'bool', etiqueta: 'QR por internet (datos móviles y cualquier Wi-Fi)', ayuda: 'Abre solo un enlace seguro de Cloudflare, gratis y sin cuenta. Por ese enlace sólo se ven las fotos de cada sesión. Si no hay internet, el QR usa el Wi-Fi del evento. Se aplica al pulsar Guardar.' },
       { tipo: 'tunel' },
       { ruta: 'compartir.urlBase', tipo: 'texto', etiqueta: 'Dirección en el Wi-Fi del evento', ayuda: 'Déjala vacía para detectarla sola. Se usa cuando no hay enlace por internet.', marcador: 'red' },
       { tipo: 'red' },
@@ -122,7 +127,11 @@ const SECCIONES = [
       { ruta: 'compartir.nube.preset', tipo: 'texto', etiqueta: 'Upload preset (Unsigned)', ayuda: 'El nombre del preset sin firmar que creaste en Cloudinary.' },
       { ruta: 'compartir.nube.urlGaleria', tipo: 'texto', etiqueta: 'Dirección de tu página de descarga', ayuda: 'Tu página en GitHub, por ejemplo https://wanna033.github.io/sonria-pues-photobooth/g. Si la dejas vacía, el QR abre la foto directamente.' },
       { ruta: 'compartir.nube.subirFotosSueltas', tipo: 'bool', etiqueta: 'Subir también las fotos individuales', ayuda: 'Apagado sube sólo la tira, el GIF y el video: más rápido y códigos QR más sencillos.' },
-      { tipo: 'accion', etiqueta: 'Prueba', boton: '☁️ Probar la conexión con la nube', accion: 'probarNube' },
+      { tipo: 'probar-nube' },
+      { h: 'Con las fotos guardadas en internet' },
+      { ruta: 'impresion.qrEnImpresion', tipo: 'bool', etiqueta: 'Imprimir el código QR en la foto', ayuda: 'Cada tira o postal lleva un QR pequeño (unos 2 cm) para descargar las fotos cuando quieran, incluso días después. Sólo funciona con "Guardar cada sesión en internet".' },
+      { ruta: 'impresion.qrPosicion', tipo: 'select', etiqueta: 'Esquina del QR en la foto', opciones: [['abajo-derecha', 'Abajo a la derecha'], ['abajo-izquierda', 'Abajo a la izquierda'], ['arriba-derecha', 'Arriba a la derecha'], ['arriba-izquierda', 'Arriba a la izquierda']] },
+      { ruta: 'compartir.qrEventoEnInicio', tipo: 'bool', etiqueta: 'QR de la galería del evento en el inicio', ayuda: 'Una esquina del inicio muestra un QR con TODAS las fotos del evento. Necesita el paso 4 de arriba ("Resource list").' },
     ],
   },
   {
@@ -188,10 +197,11 @@ export class Ajustes {
       onclick: () => this.mostrar(s.id),
     }, s.titulo)));
     this.raiz.hidden = false;
-    this.mostrar('evento');
+    this.mostrar('estado');
   }
 
   cerrar() {
+    clearInterval(this.relojEstado);
     this.editorDisenos?.salir();
     this.raiz.querySelector('.visor-sesion')?.remove();
     this.raiz.hidden = true;
@@ -202,16 +212,206 @@ export class Ajustes {
   mostrar(id) {
     const seccion = SECCIONES.find((s) => s.id === id);
     for (const b of this.pestanas.children) b.classList.toggle('activa', b.dataset.seccion === id);
+    clearInterval(this.relojEstado);
     this.editorDisenos?.salir();
     this.raiz.querySelector('.visor-sesion')?.remove();
     this.contenido.replaceChildren();
     this.contenido.scrollTop = 0;
+    if (seccion.especial === 'estado') return this.mostrarEstado();
     if (seccion.especial === 'textos') return this.mostrarTextos();
     if (seccion.especial === 'disenos') return this.mostrarDisenos();
     if (seccion.especial === 'galeria') return this.mostrarGaleria();
     if (seccion.especial === 'ayuda') return this.mostrarAyuda();
     for (const campo of seccion.campos) this.contenido.append(this.crearCampo(campo));
     if (id === 'diseno') this.mostrarEditorPlantillas();
+  }
+
+  /**
+   * Pestaña "Estado": revisión rápida antes y durante el evento (cámara,
+   * impresora, papel, QR por internet, fotos en la nube y disco).
+   */
+  async mostrarEstado() {
+    const c = this.contenido;
+    if (this.modoWeb) {
+      c.append(el('h3', {}, 'Estado'), el('p', { class: 'nota' }, 'En la versión web no hay impresora ni servidor: revisa la cámara en su pestaña.'));
+      return;
+    }
+    const tarjetas = el('div', { class: 'estado-tarjetas' }, el('p', { class: 'nota' }, 'Revisando…'));
+    const boton = (texto, accion) => el('button', { class: 'boton-secundario', type: 'button', onclick: accion }, texto);
+    c.append(
+      el('h3', {}, 'Revisión de la cabina'),
+      el('p', { class: 'nota' }, 'Revísala antes de abrir la cabina a los invitados. Se actualiza sola cada 5 segundos.'),
+      tarjetas,
+      el('h3', {}, 'Acciones rápidas'),
+      el('div', { class: 'fila-botones' },
+        boton('🖨️ Página de prueba', () => this.acciones.imprimirPrueba?.(this.borrador)),
+        boton('🔄 Renovar enlace por internet', () => this.renovarTunel()),
+        boton('☁️ Reintentar subidas', async () => {
+          await this.api('/api/nube/reintentar', { method: 'POST', json: {} }).catch(() => {});
+          this.acciones.aviso?.('☁️ Reintentando las subidas pendientes');
+        }),
+        boton('📦 Exportar evento (ZIP)', () => this.exportarEvento()),
+        boton('📂 Abrir carpeta de fotos', () => this.api('/api/abrir-carpeta', { method: 'POST' }))),
+      el('h3', {}, 'Papel en la impresora'),
+      this.controlPapel(),
+    );
+
+    const pintar = async () => {
+      let estado;
+      try {
+        estado = await this.api('/api/estado-sistema');
+      } catch (err) {
+        tarjetas.replaceChildren(el('p', { class: 'nota' }, `No se pudo leer el estado: ${err.message}`));
+        return;
+      }
+      if (tarjetas.isConnected) tarjetas.replaceChildren(...this.tarjetasEstado(estado));
+    };
+    await pintar();
+    clearInterval(this.relojEstado);
+    this.relojEstado = setInterval(() => {
+      if (!tarjetas.isConnected) clearInterval(this.relojEstado);
+      else pintar();
+    }, 5000);
+  }
+
+  tarjetasEstado(e) {
+    const cfg = this.borrador;
+    const tarjeta = (nivel, titulo, ...detalle) => el('div', { class: `estado-tarjeta ${nivel}` },
+      el('span', { class: 'estado-icono', 'aria-hidden': 'true' }, { ok: '✅', aviso: '⚠️', mal: '❌', info: 'ℹ️' }[nivel]),
+      el('div', {}, el('strong', {}, titulo), el('p', {}, ...detalle)));
+    const lista = [];
+
+    // cámara
+    lista.push(this.camara.demo
+      ? tarjeta('mal', 'Cámara', 'No se encontró cámara: se usa la de demostración. Revisa la pestaña Cámara.')
+      : tarjeta('ok', 'Cámara', `${this.camara.nombre} · ${this.camara.ancho}×${this.camara.alto}`));
+
+    // impresora
+    if (!cfg.impresion.habilitada) lista.push(tarjeta('info', 'Impresora', 'La impresión está apagada.'));
+    else if (!e.impresora) lista.push(tarjeta('aviso', 'Impresora', 'No hay una impresora predeterminada en Windows. Elige tu impresora de fotos como predeterminada.'));
+    else {
+      const i = e.impresora;
+      lista.push(tarjeta(i.problema ? 'mal' : 'ok', 'Impresora',
+        `${i.nombre} · ${i.estado}${i.trabajos ? ` · ${i.trabajos} en cola` : ''}`));
+    }
+
+    // papel
+    if (!cfg.impresion.controlarPapel) {
+      lista.push(tarjeta('info', 'Papel', 'Sin cuenta de papel. Actívala en Impresión y QR para recibir avisos.'));
+    } else {
+      const r = e.papel.restante;
+      lista.push(tarjeta(r <= 0 ? 'mal' : r <= cfg.impresion.avisoPapel ? 'aviso' : 'ok', 'Papel',
+        r <= 0 ? 'Se acabó el papel: la cabina no ofrece imprimir hasta que cargues más.' : `Quedan ${r} hojas${e.papel.cargado ? ` de ${e.papel.cargado}` : ''}.`));
+    }
+
+    // QR por internet mientras el programa está abierto
+    const tunel = {
+      activo: ['ok', 'Enlace activo y comprobado desde internet.'],
+      verificando: ['aviso', 'Comprobando el enlace nuevo… mientras tanto el QR usa el Wi-Fi.'],
+      conectando: ['aviso', 'Abriendo el enlace por internet…'],
+      reconectando: ['aviso', e.tunel.detalle || 'Sin internet; reintentando. Mientras tanto el QR usa el Wi-Fi.'],
+      apagado: ['info', 'Apagado: el QR sólo funciona en el Wi-Fi del evento.'],
+      'falta-programa': ['mal', 'Falta cloudflared.exe en la carpeta "herramientas".'],
+      error: ['mal', e.tunel.detalle || 'No se pudo abrir el enlace.'],
+    }[e.tunel.estado] || ['aviso', 'Estado desconocido.'];
+    lista.push(tarjeta(tunel[0], 'QR por internet (en vivo)', tunel[1]));
+
+    // fotos guardadas en internet
+    const n = e.nube;
+    if (!n.activa) {
+      lista.push(tarjeta('aviso', 'Fotos en internet',
+        'No se están guardando: los QR dejan de funcionar al cerrar el programa. Configura Cloudinary en Impresión y QR.'));
+    } else {
+      const partes = [`${n.guardadas} guardadas`];
+      if (n.pendientes) partes.push(`${n.pendientes} pendientes${n.subiendo ? ' (subiendo…)' : ''}`);
+      if (n.sinSubir) partes.push(`${n.sinSubir} sólo en esta computadora`);
+      lista.push(tarjeta(n.conError ? 'aviso' : 'ok', 'Fotos en internet (QR permanentes)',
+        partes.join(' · '), n.ultimoError ? el('br') : null, n.ultimoError ? `Último problema: ${n.ultimoError}` : null));
+    }
+
+    // disco
+    if (e.disco) {
+      const gb = e.disco.libre / 1024 ** 3;
+      lista.push(tarjeta(gb < 2 ? 'mal' : gb < 10 ? 'aviso' : 'ok', 'Espacio en disco',
+        `${gb.toFixed(1)} GB libres${gb < 10 ? ' · libera espacio o exporta y borra eventos viejos' : ''}`));
+    }
+
+    lista.push(tarjeta('info', 'Sesiones', `${e.sesiones.evento} en este evento · ${e.sesiones.total} en total`));
+    return lista;
+  }
+
+  /** Cargar papel: se escribe cuántas hojas se pusieron en la impresora. */
+  controlPapel() {
+    const entrada = el('input', { type: 'number', min: 0, max: 100000, step: 1, placeholder: 'Ej. 400', 'aria-label': 'Hojas cargadas', style: 'max-width:140px' });
+    const nota = el('span', { class: 'nota' });
+    this.api('/api/papel').then((p) => { nota.textContent = `Quedan ${p.restante} hojas`; }).catch(() => {});
+    return el('div', { class: 'fila-botones' }, entrada,
+      el('button', {
+        class: 'boton-secundario',
+        type: 'button',
+        onclick: async () => {
+          if (entrada.value === '') return this.acciones.aviso?.('Escribe cuántas hojas cargaste');
+          try {
+            const papel = await this.api('/api/papel', { method: 'PUT', json: { restante: Number(entrada.value) } });
+            nota.textContent = `Quedan ${papel.restante} hojas`;
+            entrada.value = '';
+            this.acciones.alCambiarPapel?.(papel);
+            this.acciones.aviso?.(`🧻 Papel cargado: ${papel.restante} hojas`);
+          } catch (err) {
+            this.acciones.aviso?.(err.message);
+          }
+        },
+      }, '🧻 Cargué papel'),
+      nota);
+  }
+
+  async renovarTunel() {
+    try {
+      await this.api('/api/tunel/reiniciar', { method: 'POST', json: {} });
+      this.acciones.aviso?.('🔄 Abriendo un enlace nuevo por internet (tarda unos segundos)');
+    } catch (err) {
+      this.acciones.aviso?.(err.message);
+    }
+  }
+
+  async exportarEvento() {
+    this.acciones.aviso?.('📦 Preparando el ZIP del evento…', 20000);
+    try {
+      const r = await this.api('/api/exportar', { method: 'POST', json: {} });
+      this.acciones.aviso?.(`📦 Listo: ${r.archivo} (${r.sesiones} sesiones, ${(r.bytes / 1024 ** 2).toFixed(0)} MB). Se abrió la carpeta.`, 9000);
+    } catch (err) {
+      this.acciones.aviso?.(`No se pudo exportar: ${err.message}`, 7000);
+    }
+  }
+
+  /** Prueba real de Cloudinary: sube una imagen, revisa que se vea desde internet y la borra. */
+  campoProbarNube() {
+    const salida = el('div', { class: 'nota resultado-prueba' });
+    const boton = el('button', {
+      class: 'boton-secundario boton-prueba-nube',
+      type: 'button',
+      onclick: async () => {
+        if (this.modoWeb) return this.acciones.probarNube?.(this.borrador);
+        boton.disabled = true;
+        salida.replaceChildren('☁️ Probando: se sube una imagen de prueba…');
+        try {
+          const r = await this.api('/api/nube/probar', { method: 'POST', json: this.borrador.compartir.nube });
+          const lineas = r.ok
+            ? ['✅ Todo listo: las fotos se suben y se ven desde cualquier celular.',
+              r.listaActiva
+                ? '✅ La galería de todo el evento también funciona.'
+                : 'ℹ️ Para la galería de todo el evento falta el paso 4 (Resource list). Lo demás ya funciona.',
+              this.borrador.compartir.nube.activo ? '' : '⚠️ Activa "Guardar cada sesión en internet" y pulsa Guardar.']
+            : [`❌ ${r.error}`];
+          salida.replaceChildren(...lineas.filter(Boolean).flatMap((l, i) => (i ? [el('br'), l] : [l])));
+        } catch (err) {
+          salida.replaceChildren(`❌ ${err.message}`);
+        } finally {
+          boton.disabled = false;
+        }
+      },
+    }, '☁️ Probar la conexión con la nube');
+    return el('div', { class: 'campo' }, el('label', {}, 'Prueba'), el('div', {}, boton, salida));
   }
 
   /** Todo lo que dice la cabina, editable sin tocar el código. */
@@ -366,6 +566,12 @@ export class Ajustes {
 
   crearCampo(campo) {
     if (campo.h) return el('h3', {}, campo.h);
+    if (campo.tipo === 'probar-nube') return this.campoProbarNube();
+    if (campo.tipo === 'papel') {
+      if (this.modoWeb) return el('span');
+      return el('div', { class: 'campo' }, el('label', {}, 'Hojas cargadas'), this.controlPapel(),
+        el('p', { class: 'ayuda' }, 'Cada vez que cambies el rollo o la bandeja, escribe cuántas hojas pusiste. Las tiras de 5×15 cm salen dos por hoja.'));
+    }
     if (campo.tipo === 'ayuda-nube') {
       return el('p', { class: 'nota' },
         'Para que los QR funcionen ', el('strong', {}, 'siempre'),
@@ -376,6 +582,8 @@ export class Ajustes {
         el('br'), '2. En Settings → Upload → Upload presets → Add upload preset, pon Signing Mode en ',
         el('code', {}, 'Unsigned'), ', guarda y copia su nombre.',
         el('br'), '3. Pega los dos datos aquí abajo, activa la opción y pulsa "Probar la conexión".',
+        el('br'), '4. (Opcional, para la galería de todo el evento) En Settings → Security → "Restricted media types" desmarca ',
+        el('code', {}, 'Resource list'), ' y guarda.',
         el('br'), 'Ninguno de los dos es una clave secreta. Las fotos quedan en internet: ',
         'cualquiera con el enlace de una sesión puede verla, pero nadie puede ver la lista de todas.');
     }
@@ -391,7 +599,11 @@ export class Ajustes {
         error: ['⚠️ No se pudo abrir el enlace por internet:', this.red?.tunel?.detalle],
       };
       const [texto, extra] = mensajes[estado] || ['Estado desconocido (el servidor no respondió).'];
-      return el('p', { class: 'nota' }, texto, extra ? el('br') : null, extra ? el('code', {}, extra) : null);
+      return el('div', { class: 'campo' }, el('label', {}, 'Estado del enlace'), el('div', {},
+        el('p', { class: 'nota', style: 'margin-top:0' }, texto, extra ? el('br') : null, extra ? el('code', {}, extra) : null),
+        this.modoWeb || estado === 'apagado' || estado === 'falta-programa'
+          ? null
+          : el('div', { class: 'fila-botones' }, el('button', { class: 'boton-secundario', type: 'button', onclick: () => this.renovarTunel() }, '🔄 Renovar enlace'))));
     }
     if (campo.tipo === 'red') {
       const ips = this.red?.ips?.length ? this.red.ips.join(', ') : 'sin conexión de red';
@@ -528,6 +740,7 @@ export class Ajustes {
     c.append(cajaEstad);
     c.append(el('div', { class: 'fila-botones', style: 'margin:16px 0' },
       el('button', { class: 'boton-secundario', onclick: () => this.api('/api/abrir-carpeta', { method: 'POST' }) }, '📂 Abrir carpeta de fotos del evento'),
+      el('button', { class: 'boton-secundario', onclick: () => this.exportarEvento() }, '📦 Exportar evento (ZIP)'),
       el('select', {
         class: 'selector-evento',
         'aria-label': 'Sesiones a mostrar',
@@ -567,8 +780,8 @@ export class Ajustes {
         const abrir = () => this.verSesion(s);
         const figura = el('figure', { title: s.evento },
           el('button', { class: 'galeria-vista', type: 'button', onclick: abrir, 'aria-label': 'Ver sesión y código QR' },
-            esImagen
-              ? el('img', { src: `/m/${s.id}/${s.principal}`, alt: '', loading: 'lazy' })
+            s.miniatura || esImagen
+              ? el('img', { src: `/m/${s.id}/${s.miniatura ? 'miniatura.jpg' : s.principal}`, alt: '', loading: 'lazy', decoding: 'async' })
               : el('div', { class: 'sin-vista' }, '🎬')),
           el('figcaption', {},
             el('span', {}, `${s.nube === 'guardada' ? '☁️ ' : s.nube === 'pendiente' ? '⏳ ' : ''}${hora} · ${s.modo}${s.impresiones ? ` · 🖨️${s.impresiones}` : ''}`),
@@ -605,11 +818,49 @@ export class Ajustes {
       return;
     }
     const partes = [`☁️ ${estado.guardadas} guardadas en internet`];
-    if (estado.pendientes) partes.push(`⏳ ${estado.pendientes} subiendo`);
+    if (estado.pendientes) partes.push(`⏳ ${estado.pendientes} pendientes${estado.subiendo ? " (subiendo…)" : ""}`);
     if (estado.sinSubir) partes.push(`${estado.sinSubir} sólo en esta computadora`);
+    let bloqueEvento = null;
+    if (estado.enlaceEvento) {
+      const qr = el('div', { class: 'qr-mini', role: 'img', 'aria-label': 'Código QR de la galería del evento' });
+      qr.innerHTML = qrSvg(estado.enlaceEvento, { nivel: 'M', margen: 2 });
+      bloqueEvento = el('div', { class: 'galeria-evento' }, qr,
+        el('div', {},
+          el('strong', {}, '📸 Galería de todo el evento'),
+          el('p', {}, estado.listaActiva === false
+            ? 'Falta activar "Resource list" en Cloudinary (paso 4 en Impresión y QR) para que esta galería muestre las fotos.'
+            : 'Compártela con el cliente al terminar: muestra todas las fotos guardadas en internet de este evento.'),
+          el('code', { class: 'visor-url' }, estado.enlaceEvento),
+          el('div', { class: 'fila-botones' },
+            el('button', {
+              class: 'boton-secundario',
+              type: 'button',
+              onclick: async () => {
+                try {
+                  await navigator.clipboard.writeText(estado.enlaceEvento);
+                  this.acciones.aviso?.('📋 Enlace copiado');
+                } catch {
+                  this.acciones.aviso?.('No se pudo copiar; selecciónalo y cópialo a mano');
+                }
+              },
+            }, '📋 Copiar enlace'))));
+    }
     caja.replaceChildren(
       el('strong', {}, partes.join(' · ')),
       estado.ultimoError ? el('span', {}, el('br'), `⚠️ Último problema al subir: ${estado.ultimoError}`) : null,
+      estado.conError
+        ? el('div', { class: 'fila-botones', style: 'margin-top:10px' },
+          el('button', {
+            class: 'boton-secundario',
+            type: 'button',
+            onclick: async () => {
+              await this.api('/api/nube/reintentar', { method: 'POST', json: {} }).catch(() => {});
+              this.acciones.aviso?.('☁️ Reintentando las subidas pendientes');
+              setTimeout(() => this.pintarEstadoNube(caja), 4000);
+            },
+          }, '🔁 Reintentar ahora'))
+        : null,
+      bloqueEvento,
       estado.sinSubir
         ? el('div', { class: 'fila-botones', style: 'margin-top:10px' },
           el('button', {
@@ -698,6 +949,10 @@ export class Ajustes {
       p('Pon tu impresora de fotos como predeterminada en Windows, con papel 10×15 cm (4×6") y sin bordes. Las tiras de 5×15 cm salen dos por hoja: corta por la mitad (muchas impresoras de sublimación lo hacen solas con la opción “2 inch cut”).'),
       el('h3', {}, 'Código QR'),
       p('Si esta computadora tiene internet, los invitados descargan sus fotos con sus datos móviles o desde cualquier Wi-Fi: la cabina abre sola un enlace seguro de Cloudflare (revisa su estado en Impresión y QR). Sin internet, el QR funciona sólo para quienes estén en el mismo Wi-Fi que esta computadora.'),
+      p('Para que los QR funcionen SIEMPRE (días después y con la computadora apagada), activa "Guardar las fotos en internet" (Cloudinary, gratis). Si no hay internet en el evento, las fotos se suben solas cuando vuelva; mientras tanto el celular muestra "Tus fotos se están subiendo".'),
+      el('h3', {}, 'Antes de cada evento'),
+      p('Abre la pestaña ', code('Estado'), ': todo debe estar en ✅. Carga el papel (🧻), imprime la página de prueba y escanea un QR de prueba con datos móviles.'),
+      p('Al terminar, ', code('📦 Exportar evento (ZIP)'), ' arma un archivo ordenado (impresiones, GIF, videos y fotos) para entregarlo al cliente.'),
       el('h3', {}, 'Cámara profesional'),
       p('Canon (EOS Webcam Utility), Nikon (Webcam Utility), Sony (Imaging Edge Webcam) y Fujifilm (X Webcam) permiten usar tu cámara como webcam. Instala la utilidad, conecta la cámara por USB y elígela en la pestaña Cámara.'),
       el('h3', {}, 'Dónde quedan las fotos'),

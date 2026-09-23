@@ -12,7 +12,7 @@ import {
   dibujarMarcaDeAgua, dibujarCubriendo, dibujarStickers, tamanoDePlantilla, tamanoImpresion, todasLasPlantillas,
 } from './plantillas.js';
 import { crearGif } from './gif.js';
-import { qrSvg } from './qr.js';
+import { qrSvg, generarQR } from './qr.js';
 import { configurarSonidos, pitido, obturador, exito, hablar } from './sonidos.js';
 import { EditorStickers } from './stickers.js';
 import { Ajustes } from './ajustes.js';
@@ -52,6 +52,7 @@ const estado = {
   finHasta: 0,
   urls: [],
   detenerVideo: null,
+  papel: null, // hojas que quedan en la impresora (si se lleva la cuenta)
 };
 
 const camara = new Camara();
@@ -349,7 +350,7 @@ async function cargarRecientes() {
   }
   let lista = [];
   try {
-    lista = (await api('/api/sesiones?limite=12')).filter((s) => /\.(jpg|gif)$/.test(s.principal)).slice(0, 6);
+    lista = (await api('/api/sesiones?limite=12')).filter((s) => s.miniatura || /\.(jpg|gif)$/.test(s.principal)).slice(0, 6);
   } catch { /* sin servidor: se omite */ }
   contenido.classList.toggle('sin-recientes', lista.length === 0);
   contenedor.replaceChildren(...lista.reverse().map((s, i) => {
@@ -360,8 +361,9 @@ async function cargarRecientes() {
     div.style.top = `${pos.t}%`;
     div.style.transform = `rotate(${pos.r}deg)`;
     const img = document.createElement('img');
-    img.src = `/m/${s.id}/${s.principal}`;
+    img.src = s.miniatura ? `/m/${s.id}/miniatura.jpg` : `/m/${s.id}/${s.principal}`;
     img.alt = '';
+    img.decoding = 'async';
     div.appendChild(img);
     return div;
   }));
@@ -635,7 +637,7 @@ async function capturarBoomerang(token) {
     alProgreso: (f) => progreso(t('procesandoBoomerang'), f * 0.8),
   });
   revisarToken(token);
-  await guardarSesion([['boomerang.gif', gif]], 'boomerang.gif', token);
+  await guardarSesion([['boomerang.gif', gif], ['miniatura.jpg', await miniaturaDe(lienzo)]], 'boomerang.gif', token);
   estado.resultado = { tipo: 'imagen', url: urlDe(gif) };
   mostrarFinal();
 }
@@ -722,7 +724,7 @@ async function capturarVideo(token) {
   const mime = (grabadora.mimeType || tipo || 'video/webm').split(';')[0];
   const blob = new Blob(partes, { type: mime });
   const nombre = mime.includes('mp4') ? 'video.mp4' : 'video.webm';
-  await guardarSesion([[nombre, blob]], nombre, token);
+  await guardarSesion([[nombre, blob], ['miniatura.jpg', await miniaturaDe(lienzo)]], nombre, token);
   estado.resultado = { tipo: 'video', url: urlDe(blob) };
   mostrarFinal();
 }
@@ -802,13 +804,31 @@ async function fotosIndividuales() {
   return archivos;
 }
 
-async function guardarSesion(archivos, principal, token) {
+/** Vista chica (480 px en su lado largo) para la galería y el inicio: cargan mucho más rápido. */
+function miniaturaDe(fuente) {
+  const escala = Math.min(1, 480 / Math.max(fuente.width, fuente.height));
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(fuente.width * escala));
+  c.height = Math.max(1, Math.round(fuente.height * escala));
+  c.getContext('2d').drawImage(fuente, 0, 0, c.width, c.height);
+  return lienzoABlob(c, 'image/jpeg', 0.8);
+}
+
+function crearSesion(principal) {
+  return api('/api/sesiones', {
+    method: 'POST',
+    json: { modo: estado.modo, plantilla: estado.plantilla?.id, filtro: estado.filtro, principal },
+  });
+}
+
+/**
+ * @param {Array<[string, Blob]>} archivos
+ * @param {object} [creada] sesión ya creada antes (cuando el QR va impreso en la foto)
+ */
+async function guardarSesion(archivos, principal, token, creada = null) {
   try {
     progreso($('#procesando-texto').textContent, 0.85);
-    const sesion = await api('/api/sesiones', {
-      method: 'POST',
-      json: { modo: estado.modo, plantilla: estado.plantilla?.id, filtro: estado.filtro, principal },
-    });
+    const sesion = creada || await crearSesion(principal);
     for (const [n, [nombre, blob]] of archivos.entries()) {
       revisarToken(token);
       await api(`/api/sesiones/${sesion.id}/${nombre}`, { method: 'PUT', body: blob, headers: { 'Content-Type': blob.type } });
@@ -859,6 +879,68 @@ async function compartirEnInternet(archivos, token) {
   }
 }
 
+/**
+ * QR impreso en la foto: con las fotos guardadas en internet, el enlace se
+ * reserva ANTES de armar la impresión y se dibuja en una esquina. Así el
+ * invitado puede descargar sus fotos cuando quiera, escaneando su tira.
+ * @returns {Promise<object|null>} la sesión ya creada (o null)
+ */
+async function ponerQrEnImpresion(conGif) {
+  const { impresion } = estado.config;
+  if (MODO_WEB || !impresion.qrEnImpresion || !nubeActiva(estado.config)) return null;
+  let sesion = null;
+  try {
+    sesion = await crearSesion('recuerdo.jpg');
+    const planeados = ['recuerdo.jpg', ...estado.fotos.map((_, i) => `foto-${i + 1}.jpg`), ...(conGif ? ['animacion.gif'] : [])];
+    const r = await api(`/api/sesiones/${sesion.id}/reservar`, { method: 'POST', json: { archivos: planeados } });
+    if (r.url) {
+      dibujarQrEnFoto(estado.compuesto, r.url, {
+        duplicar: estado.plantilla.duplicar,
+        tamano: tamanoDePlantilla(estado.plantilla),
+        posicion: impresion.qrPosicion,
+      });
+    }
+  } catch (err) {
+    console.error('No se pudo poner el QR en la impresión', err);
+  }
+  return sesion;
+}
+
+/** Dibuja el QR (≈2 cm, con recuadro blanco) en una esquina de cada tira de la hoja. */
+function dibujarQrEnFoto(lienzo, url, { duplicar, tamano, posicion = 'abajo-derecha' }) {
+  const qr = generarQR(url, 'M');
+  const ctx = lienzo.getContext('2d');
+  const unidades = duplicar ? 2 : 1;
+  const anchoUnidad = lienzo.width / unidades;
+  const pxPorPulgada = lienzo.width / tamano.anchoIn;
+  const lado = Math.round(Math.min(0.85 * pxPorPulgada, 0.34 * Math.min(anchoUnidad, lienzo.height)));
+  const borde = Math.round(0.12 * pxPorPulgada);
+  const margen = 2; // módulos blancos alrededor
+  const modulo = lado / (qr.tamano + margen * 2);
+  const derecha = !posicion.endsWith('izquierda');
+  const abajo = !posicion.startsWith('arriba');
+  for (let u = 0; u < unidades; u++) {
+    const x0 = Math.round(u * anchoUnidad + (derecha ? anchoUnidad - lado - borde : borde));
+    const y0 = abajo ? lienzo.height - lado - borde : borde;
+    ctx.save();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.roundRect(x0, y0, lado, lado, lado * 0.06);
+    ctx.fill();
+    ctx.fillStyle = '#000000';
+    for (let y = 0; y < qr.tamano; y++) {
+      for (let x = 0; x < qr.tamano; x++) {
+        if (!qr.oscuro(x, y)) continue;
+        const px = x0 + (x + margen) * modulo;
+        const py = y0 + (y + margen) * modulo;
+        // se redondea hacia afuera para que no queden líneas blancas entre módulos
+        ctx.fillRect(Math.floor(px), Math.floor(py), Math.ceil(px + modulo) - Math.floor(px), Math.ceil(py + modulo) - Math.floor(py));
+      }
+    }
+    ctx.restore();
+  }
+}
+
 async function finalizarFoto(stickers, token) {
   ir('procesando');
   try {
@@ -868,16 +950,19 @@ async function finalizarFoto(stickers, token) {
       const { width, height } = estado.compuesto;
       dibujarStickers(estado.compuesto.getContext('2d'), stickers, width, height, estado.config);
     }
-    const recuerdo = await lienzoABlob(estado.compuesto, 'image/jpeg', 0.93);
-    const archivos = [['recuerdo.jpg', recuerdo], ...await fotosIndividuales()];
+    const conGif = estado.config.gif.tambienEnModoFoto && estado.fotos.length > 1;
+    const creada = await ponerQrEnImpresion(conGif);
     revisarToken(token);
-    if (estado.config.gif.tambienEnModoFoto && estado.fotos.length > 1) {
+    const recuerdo = await lienzoABlob(estado.compuesto, 'image/jpeg', 0.93);
+    const archivos = [['recuerdo.jpg', recuerdo], ...await fotosIndividuales(), ['miniatura.jpg', await miniaturaDe(estado.compuesto)]];
+    revisarToken(token);
+    if (conGif) {
       progreso(t('procesandoGifExtra'), 0.3);
       archivos.push(['animacion.gif', await gifDeFotos(estado.fotos, (f) => progreso(t('procesandoGifExtra'), 0.3 + f * 0.5))]);
     }
     revisarToken(token);
     progreso(t('procesandoGuardando'), 0.85);
-    await guardarSesion(archivos, 'recuerdo.jpg', token);
+    await guardarSesion(archivos, 'recuerdo.jpg', token, creada);
     estado.resultado = {
       tipo: 'imagen',
       url: urlDe(recuerdo),
@@ -899,7 +984,7 @@ async function finalizarGif(token) {
     progreso(t('procesandoGif'), 0.05);
     const gif = await gifDeFotos(estado.fotos, (f) => progreso(t('procesandoGif'), 0.05 + f * 0.75));
     revisarToken(token);
-    await guardarSesion([['animacion.gif', gif], ...await fotosIndividuales()], 'animacion.gif', token);
+    await guardarSesion([['animacion.gif', gif], ...await fotosIndividuales(), ['miniatura.jpg', await miniaturaDe(estado.fotos[0])]], 'animacion.gif', token);
     estado.resultado = { tipo: 'imagen', url: urlDe(gif) };
     mostrarFinal();
   } catch (err) {
@@ -937,9 +1022,9 @@ function mostrarFinal() {
     const extension = resultado.tipo === 'video' ? 'mp4' : (estado.modo === 'foto' ? 'jpg' : 'gif');
     enlaceDescarga.download = `${marcaEnArchivo}-${Date.now()}.${extension}`;
   }
-  const puedeImprimir = !MODO_WEB && resultado.imprimible && config.impresion.habilitada;
+  const puedeImprimir = !MODO_WEB && resultado.imprimible && config.impresion.habilitada && papelDisponible() > 0;
   $('#bloque-impresion').hidden = !puedeImprimir;
-  estado.copias = Math.min(config.impresion.copiasPorDefecto, config.impresion.copiasMaximas);
+  estado.copias = Math.min(config.impresion.copiasPorDefecto, copiasMaximas());
   actualizarCopias();
   const botonImprimir = $('#btn-imprimir');
   botonImprimir.disabled = false;
@@ -962,8 +1047,52 @@ function mostrarFinal() {
   estado.historial = [];
 }
 
+/** Hojas que quedan en la impresora (Infinity si no se lleva la cuenta). */
+function papelDisponible() {
+  if (!estado.config.impresion.controlarPapel || !estado.papel) return Infinity;
+  return estado.papel.restante;
+}
+
+function copiasMaximas() {
+  return Math.max(1, Math.min(estado.config.impresion.copiasMaximas, papelDisponible()));
+}
+
+async function actualizarPapel(papel) {
+  if (MODO_WEB) return;
+  if (papel) estado.papel = papel;
+  else {
+    try {
+      estado.papel = await api('/api/papel');
+    } catch { /* sin servidor */ }
+  }
+  pintarAvisosOperador();
+}
+
+/** Aviso discreto en el inicio para quien atiende la cabina (papel por acabarse). */
+function pintarAvisosOperador() {
+  const caja = $('#aviso-papel');
+  const quedan = papelDisponible();
+  caja.hidden = !(quedan <= estado.config.impresion.avisoPapel);
+  caja.textContent = quedan <= 0
+    ? '🧻 Se acabó el papel. Al cargar más, actualízalo en Ajustes → Estado.'
+    : `🧻 Quedan ${quedan} ${quedan === 1 ? 'hoja' : 'hojas'} de papel`;
+}
+
+/** QR con la galería de TODO el evento en una esquina del inicio (opcional). */
+async function pintarQrEvento() {
+  const caja = $('#qr-evento');
+  caja.hidden = true;
+  if (MODO_WEB || !estado.config.compartir.qrEventoEnInicio) return;
+  try {
+    const nube = await api('/api/nube/estado');
+    if (!nube.enlaceEvento) return;
+    caja.querySelector('.qr-evento-codigo').innerHTML = qrSvg(nube.enlaceEvento, { nivel: 'M', margen: 2 });
+    caja.hidden = false;
+  } catch { /* sin nube */ }
+}
+
 function actualizarCopias() {
-  const max = estado.config.impresion.copiasMaximas;
+  const max = copiasMaximas();
   $('#copias-numero').textContent = estado.copias;
   $('#copias-etiqueta').textContent = t(estado.copias === 1 ? 'finalCopia' : 'finalCopias');
   $('#btn-copias-menos').disabled = estado.copias <= 1 || estado.impreso;
@@ -1020,7 +1149,8 @@ async function imprimirSesion() {
   aviso(estado.copias === 1 ? t('avisoImprimiendoUna') : t('avisoImprimiendoVarias', { n: estado.copias }));
   hablar(t('vozImprimiendo'));
   if (estado.sesion) {
-    api(`/api/sesiones/${estado.sesion.id}/impresiones`, { method: 'POST', json: { copias: estado.copias } }).catch(() => {});
+    api(`/api/sesiones/${estado.sesion.id}/impresiones`, { method: 'POST', json: { copias: estado.copias } })
+      .then((r) => actualizarPapel(r.papel)).catch(() => {});
   }
   estado.finHasta = Math.max(estado.finHasta, Date.now() + 20000);
 }
@@ -1045,7 +1175,8 @@ async function reimprimir(sesion) {
   const img = await cargarImagen(url);
   if (!img) return aviso('No se encontró la imagen de esa sesión');
   await imprimirImagen(url, tamanoDeSesion(sesion, img), 1);
-  api(`/api/sesiones/${sesion.id}/impresiones`, { method: 'POST', json: { copias: 1 } }).catch(() => {});
+  api(`/api/sesiones/${sesion.id}/impresiones`, { method: 'POST', json: { copias: 1 } })
+    .then((r) => actualizarPapel(r.papel)).catch(() => {});
 }
 
 // ================================================================ PIN y ajustes
@@ -1119,6 +1250,8 @@ async function alGuardarAjustes(nueva) {
   }
   aviso('✅ Ajustes guardados');
   reiniciar();
+  actualizarPapel();
+  pintarQrEvento();
 }
 
 // ================================================================ inactividad
@@ -1175,7 +1308,7 @@ function conectarEventos() {
 
   $('#btn-copias-menos').addEventListener('click', () => { estado.copias = Math.max(1, estado.copias - 1); actualizarCopias(); });
   $('#btn-copias-mas').addEventListener('click', () => {
-    estado.copias = Math.min(estado.config.impresion.copiasMaximas, estado.copias + 1);
+    estado.copias = Math.min(copiasMaximas(), estado.copias + 1);
     actualizarCopias();
   });
   $('#btn-imprimir').addEventListener('click', imprimirSesion);
@@ -1238,6 +1371,7 @@ async function arrancar() {
         estado.config = config;
         await aplicarConfig();
       },
+      alCambiarPapel: (papel) => actualizarPapel(papel),
       aviso,
       imprimirPrueba,
       reimprimir,
@@ -1259,6 +1393,8 @@ async function arrancar() {
   vigilarCamaras();
   mostrarPantalla('inicio');
   cargarRecientes();
+  actualizarPapel();
+  pintarQrEvento();
   await carga.ocultar();
 
   if (new URLSearchParams(location.search).has('ajustes')) abrirAjustes();

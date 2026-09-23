@@ -80,7 +80,8 @@ export async function subirArchivo(config, nombre, blob) {
 export async function subirSesion(config, archivos, alProgreso = () => {}) {
   const { subirFotosSueltas } = config.compartir.nube;
   // por defecto sólo el recuerdo, el GIF y el video: menos espera y códigos QR más simples
-  const lista = archivos.filter(([nombre]) => subirFotosSueltas || !/^foto-\d+\.jpg$/.test(nombre));
+  const lista = archivos.filter(([nombre]) => nombre !== 'miniatura.jpg'
+    && (subirFotosSueltas || !/^foto-\d+\.jpg$/.test(nombre)));
   const subidos = [];
   for (const [nombre, blob] of lista) {
     subidos.push(await subirArchivo(config, nombre, blob));
