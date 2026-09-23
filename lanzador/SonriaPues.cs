@@ -17,7 +17,11 @@ using System.Windows.Forms;
 
 static class SonriaPues
 {
+    // la cabina se abre en "localhost" (ahí guarda Edge los permisos de la cámara)...
     const string Direccion = "http://localhost:5050";
+    // ...pero para hablar con el servidor se usa 127.0.0.1: con "localhost" Windows prueba
+    // primero IPv6 (::1), el servidor escucha en IPv4 y la consulta se queda esperando
+    const string DireccionServidor = "http://127.0.0.1:5050";
     const string Titulo = "Sonría Pues";
 
     [STAThread]
@@ -81,19 +85,35 @@ static class SonriaPues
             : "--kiosk \"" + Direccion + "\" --edge-kiosk-type=fullscreen --kiosk-printing" +
               " --overscroll-history-navigation=0 --disable-pinch" + comunes;
 
-        try
+        // se comprueba que la ventana aparezca; si Edge no la abre (por ejemplo, porque una
+        // ventana anterior se estaba cerrando), se intenta otra vez
+        bool abierta = false;
+        for (int intento = 0; intento < 3 && !abierta; intento++)
         {
-            Process.Start(new ProcessStartInfo(navegador, opciones) { UseShellExecute = false });
+            try
+            {
+                Process.Start(new ProcessStartInfo(navegador, opciones) { UseShellExecute = false });
+            }
+            catch (Exception error)
+            {
+                Avisar("No se pudo abrir la cabina.\n\n" + error.Message);
+                Apagar(servidor);
+                return 1;
+            }
+            for (int i = 0; i < 20 && !abierta; i++)
+            {
+                Thread.Sleep(500);
+                abierta = CabinaAbierta(perfil);
+            }
         }
-        catch (Exception error)
+        if (!abierta)
         {
-            Avisar("No se pudo abrir la cabina.\n\n" + error.Message);
+            Avisar("La ventana de la cabina no se abrió. Cierra Edge por completo e intenta de nuevo.");
             Apagar(servidor);
             return 1;
         }
 
         // 3. esperar a que se cierre la cabina y apagar lo que abrimos
-        Thread.Sleep(5000);
         while (CabinaAbierta(perfil)) Thread.Sleep(2000);
         Apagar(servidor);
         return 0;
@@ -103,7 +123,8 @@ static class SonriaPues
     {
         try
         {
-            var peticion = (HttpWebRequest)WebRequest.Create(Direccion + "/api/red");
+            var peticion = (HttpWebRequest)WebRequest.Create(DireccionServidor + "/api/red");
+            peticion.Proxy = null;
             peticion.Timeout = 1500;
             using (var respuesta = (HttpWebResponse)peticion.GetResponse())
                 return respuesta.StatusCode == HttpStatusCode.OK;
@@ -122,7 +143,8 @@ static class SonriaPues
     {
         try
         {
-            var peticion = (HttpWebRequest)WebRequest.Create(Direccion + "/api/apagar");
+            var peticion = (HttpWebRequest)WebRequest.Create(DireccionServidor + "/api/apagar");
+            peticion.Proxy = null;
             peticion.Method = "POST";
             peticion.ContentLength = 0;
             peticion.Timeout = 3000;
