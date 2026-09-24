@@ -35,8 +35,23 @@ export const GRUPOS_TEXTOS = [
     ],
   },
   {
+    titulo: 'Formulario de datos (opcional)',
+    claves: [
+      ['datosTitulo', 'Título', 'Déjanos tus datos'],
+      ['datosSubtitulo', 'Subtítulo', 'Así te enviamos tus fotos y novedades'],
+      ['datosNombre', 'Campo nombre', 'Nombre'],
+      ['datosCorreo', 'Campo correo', 'Correo electrónico'],
+      ['datosTelefono', 'Campo celular', 'Celular'],
+      ['datosAcepto', 'Casilla de autorización', 'Acepto que usen mis datos para enviarme mis fotos y novedades.'],
+      ['datosContinuar', 'Botón continuar', 'Continuar'],
+      ['datosOmitir', 'Botón omitir', 'Omitir'],
+      ['datosFaltan', 'Aviso si falta algo', 'Completa tus datos y marca la autorización'],
+    ],
+  },
+  {
     titulo: 'Diseño y estilo',
     claves: [
+      ['fondoTitulo', 'Título para elegir el fondo (pantalla verde)', 'Elige tu fondo'],
       ['plantillaTitulo', 'Título de los diseños', 'Elige tu diseño'],
       ['filtroTitulo', 'Título de los filtros', 'Elige un estilo'],
       ['filtroBoton', 'Botón para empezar a posar', '¡Listo, a posar!'],

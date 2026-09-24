@@ -3,7 +3,10 @@
 // Abre la cabina como un programa normal, sin ventanas negras:
 //   1. arranca el servidor escondido (node\node.exe server.js), si no estaba abierto;
 //   2. abre la cabina en Edge (pantalla completa) o, con --configurar, en una ventana con los ajustes;
-//   3. cuando se cierra la cabina, apaga el servidor y el enlace por internet.
+//   3. mientras la cabina está abierta, vigila el servidor: si se cierra o se traba, lo vuelve a abrir;
+//   4. cuando se cierra la cabina, apaga el servidor y el enlace por internet.
+//
+// Con --presentacion abre la presentación en vivo (para una TV) y termina.
 //
 // Se compila con "compilar.bat" (usa el compilador de C# que ya trae Windows).
 
@@ -29,6 +32,7 @@ static class SonriaPues
     {
         string carpeta = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
         bool configurar = Array.Exists(argumentos, a => a.Equals("--configurar", StringComparison.OrdinalIgnoreCase));
+        bool presentacion = Array.Exists(argumentos, a => a.Equals("--presentacion", StringComparison.OrdinalIgnoreCase));
 
         if (!File.Exists(Path.Combine(carpeta, "server.js")))
         {
@@ -36,21 +40,36 @@ static class SonriaPues
             return 1;
         }
 
+        // presentación en vivo: necesita la cabina abierta; usa su propio perfil del navegador.
+        // (El perfil vive dentro de datos\navegador*, así que mientras la presentación esté
+        // abierta el servidor no se apaga aunque se cierre la cabina.)
+        if (presentacion)
+        {
+            if (!ServidorResponde())
+            {
+                Avisar("Abre primero la cabina (Sonría Pues) y después la presentación.");
+                return 1;
+            }
+            string nav = BuscarNavegador();
+            if (nav == null)
+            {
+                Avisar("No encontré Microsoft Edge ni Google Chrome. Instala uno de los dos.");
+                return 1;
+            }
+            string perfilPresentacion = Path.Combine(carpeta, @"datos\navegador-presentacion");
+            Process.Start(new ProcessStartInfo(nav,
+                "--app=\"" + Direccion + "/presentacion.html\" --window-size=1280,720 --autoplay-policy=no-user-gesture-required" +
+                " --user-data-dir=\"" + perfilPresentacion + "\" --no-first-run --disable-features=Translate") { UseShellExecute = false });
+            return 0;
+        }
+
         // 1. servidor escondido (si ya estaba abierto, se usa ese)
         Process servidor = null;
         if (!ServidorResponde())
         {
-            string node = Path.Combine(carpeta, @"node\node.exe");
-            if (!File.Exists(node)) node = "node";
             try
             {
-                servidor = Process.Start(new ProcessStartInfo(node, "server.js")
-                {
-                    WorkingDirectory = carpeta,
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    WindowStyle = ProcessWindowStyle.Hidden,
-                });
+                servidor = IniciarServidor(carpeta);
             }
             catch (Exception error)
             {
@@ -113,10 +132,47 @@ static class SonriaPues
             return 1;
         }
 
-        // 3. esperar a que se cierre la cabina y apagar lo que abrimos
-        while (CabinaAbierta(perfil)) Thread.Sleep(2000);
+        // 3. esperar a que se cierre la cabina, vigilando que el servidor siga vivo
+        int fallos = 0;
+        while (CabinaAbierta(perfil))
+        {
+            Thread.Sleep(2000);
+            if (ServidorResponde())
+            {
+                fallos = 0;
+                continue;
+            }
+            // tres revisiones seguidas sin respuesta (unos 10 s): se vuelve a abrir
+            if (++fallos < 3) continue;
+            fallos = 0;
+            try
+            {
+                if (servidor != null && !servidor.HasExited) servidor.Kill();
+            }
+            catch { }
+            try
+            {
+                servidor = IniciarServidor(carpeta);
+            }
+            catch { }
+        }
+
+        // 4. apagar lo que abrimos
         Apagar(servidor);
         return 0;
+    }
+
+    static Process IniciarServidor(string carpeta)
+    {
+        string node = Path.Combine(carpeta, @"node\node.exe");
+        if (!File.Exists(node)) node = "node";
+        return Process.Start(new ProcessStartInfo(node, "server.js")
+        {
+            WorkingDirectory = carpeta,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WindowStyle = ProcessWindowStyle.Hidden,
+        });
     }
 
     static bool ServidorResponde()

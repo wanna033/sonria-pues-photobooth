@@ -49,7 +49,10 @@ fotos se suben solas en cuanto vuelve. Se configura en *Ajustes → Impresión y
 
 Funciones profesionales: QR impreso en la foto, galería con todas las fotos del evento,
 botón para compartir en WhatsApp/Instagram, pestaña **Estado** (cámara, impresora, papel,
-internet, nube y disco), contador de papel y exportación del evento en ZIP.
+internet, nube y disco), contador de papel, exportación del evento en ZIP, **pantalla
+verde**, **presentación en vivo** para TV, formulario de datos (exporta a Excel), sugerencias
+de pose, impresión automática, marco en GIF/video, respaldo automático a USB o la nube y
+recuperación sola si el servidor se cae.
 
 ## Qué hay en cada carpeta
 

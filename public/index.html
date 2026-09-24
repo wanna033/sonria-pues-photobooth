@@ -48,6 +48,27 @@
     </div>
   </section>
 
+  <!-- ============================================================ DATOS (formulario opcional) -->
+  <section class="pantalla" id="p-datos" data-pantalla="datos">
+    <header class="encabezado">
+      <button class="boton-volver" data-accion="inicio" aria-label="Volver">‹</button>
+      <h2 data-texto="datosTitulo">Déjanos tus datos</h2>
+      <p class="subtitulo" data-texto="datosSubtitulo">Así te enviamos tus fotos y novedades</p>
+    </header>
+    <form class="formulario-datos" id="formulario-datos" novalidate autocomplete="off">
+      <label class="dato" id="dato-nombre"><span data-texto="datosNombre">Nombre</span><input name="nombre" type="text" maxlength="80" autocomplete="off"></label>
+      <label class="dato" id="dato-correo"><span data-texto="datosCorreo">Correo electrónico</span><input name="correo" type="email" inputmode="email" maxlength="120" autocomplete="off"></label>
+      <label class="dato" id="dato-telefono"><span data-texto="datosTelefono">Celular</span><input name="telefono" type="tel" inputmode="tel" maxlength="30" autocomplete="off"></label>
+      <label class="dato-acepto"><input name="acepta" type="checkbox"><span data-texto="datosAcepto">Acepto que usen mis datos para enviarme mis fotos y novedades.</span></label>
+      <p class="datos-error" id="datos-error" role="alert" hidden></p>
+      <button type="submit" hidden></button>
+    </form>
+    <div class="barra-acciones">
+      <button class="boton-secundario grande" id="btn-datos-omitir" data-texto="datosOmitir">Omitir</button>
+      <button class="boton-gigante" id="btn-datos-continuar" data-texto="datosContinuar">Continuar</button>
+    </div>
+  </section>
+
   <!-- ============================================================ MODO -->
   <section class="pantalla" id="p-modo" data-pantalla="modo">
     <header class="encabezado">
@@ -64,6 +85,15 @@
       <h2 data-texto="plantillaTitulo">Elige tu diseño</h2>
     </header>
     <div class="opciones-plantilla" id="opciones-plantilla"></div>
+  </section>
+
+  <!-- ============================================================ FONDO (pantalla verde) -->
+  <section class="pantalla" id="p-fondo" data-pantalla="fondo">
+    <header class="encabezado">
+      <button class="boton-volver" data-accion="atras" aria-label="Volver">‹</button>
+      <h2 data-texto="fondoTitulo">Elige tu fondo</h2>
+    </header>
+    <div class="opciones-fondo" id="opciones-fondo"></div>
   </section>
 
   <!-- ============================================================ FILTRO -->
@@ -89,6 +119,7 @@
     <div class="captura-indicador" id="captura-indicador"></div>
     <div class="cuenta" id="cuenta" aria-live="assertive"></div>
     <div class="mensaje-grande" id="mensaje-captura"></div>
+    <p class="sugerencia-pose" id="sugerencia-pose" aria-live="polite" hidden></p>
     <div class="grabando" id="grabando" hidden>
       <span class="punto-rojo"></span><span id="grabando-tiempo">0:10</span>
       <button class="boton-secundario" id="btn-detener-video" data-texto="capturaDetener">Detener</button>
@@ -206,6 +237,7 @@
   </div>
 
   <div class="aviso-flotante" id="aviso-flotante" role="status" hidden></div>
+  <div class="aviso-servidor" id="aviso-servidor" role="alert" hidden>⚠️ Reconectando con la cabina… no la cierres.</div>
 
   <!-- área que sólo aparece al imprimir -->
   <div id="area-impresion"></div>

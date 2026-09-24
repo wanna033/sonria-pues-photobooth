@@ -10,7 +10,8 @@
     "logoClaro": "marca/logo-claro.png",
     "mostrarNombre": false,
     "animacionCarga": true,
-    "marcaDeAgua": true
+    "marcaDeAgua": true,
+    "marcoAnimado": ""
   },
   "textos": {},
   "evento": {
@@ -36,10 +37,36 @@
     "flash": true,
     "sonidos": true,
     "voz": true,
-    "permitirRepetir": true
+    "permitirRepetir": true,
+    "sugerenciasPose": true,
+    "poses": [
+      "¡Cara de sorpresa! 😮",
+      "¡Todos abrazados! 🤗",
+      "¡Pose de modelo! 😎",
+      "¡Un corazón con las manos! 🫶",
+      "¡La carcajada más grande! 😂",
+      "¡Cara de enojados! 😠",
+      "¡Un beso al aire! 😘",
+      "¡Señalen a la cámara! 👉",
+      "¡Cara de susto! 😱",
+      "¡Brazos arriba! 🙌"
+    ]
+  },
+  "pantallaVerde": {
+    "activo": false,
+    "color": "verde",
+    "tolerancia": 50,
+    "fondos": []
   },
   "plantillas": {
-    "habilitadas": ["tira-4", "postal-1", "cuadricula-4", "grande-3", "tira-3", "retrato-1"],
+    "habilitadas": [
+      "tira-4",
+      "postal-1",
+      "cuadricula-4",
+      "grande-3",
+      "tira-3",
+      "retrato-1"
+    ],
     "porDefecto": "tira-4",
     "fondo": "degradado",
     "fondoImagen": "",
@@ -49,17 +76,61 @@
   },
   "filtros": {
     "mostrarSelector": true,
-    "habilitados": ["normal", "bn", "glamour", "sepia", "vintage", "calido", "frio", "vivido", "belleza"],
+    "habilitados": [
+      "normal",
+      "bn",
+      "glamour",
+      "sepia",
+      "vintage",
+      "calido",
+      "frio",
+      "vivido",
+      "belleza"
+    ],
     "porDefecto": "normal"
   },
   "stickers": {
     "habilitados": true,
-    "frases": ["¡Salud! 🥂", "Los mejores", "#SonriaPues", "Te quiero", "¡Qué noche!"],
+    "frases": [
+      "¡Salud! 🥂",
+      "Los mejores",
+      "#SonriaPues",
+      "Te quiero",
+      "¡Qué noche!"
+    ],
     "emojis": [
-      "👑", "🎩", "🕶️", "🥸", "💋", "🎀", "🌹", "💐",
-      "❤️", "💖", "💍", "🥂", "🍾", "🎂", "🎉", "🎈",
-      "⭐", "✨", "🔥", "💯", "😎", "🥳", "😂", "😍",
-      "🦄", "🐶", "🐱", "🌈", "🎸", "🎤", "🤠", "👸"
+      "👑",
+      "🎩",
+      "🕶️",
+      "🥸",
+      "💋",
+      "🎀",
+      "🌹",
+      "💐",
+      "❤️",
+      "💖",
+      "💍",
+      "🥂",
+      "🍾",
+      "🎂",
+      "🎉",
+      "🎈",
+      "⭐",
+      "✨",
+      "🔥",
+      "💯",
+      "😎",
+      "🥳",
+      "😂",
+      "😍",
+      "🦄",
+      "🐶",
+      "🐱",
+      "🌈",
+      "🎸",
+      "🎤",
+      "🤠",
+      "👸"
     ]
   },
   "gif": {
@@ -84,7 +155,8 @@
     "controlarPapel": false,
     "avisoPapel": 20,
     "qrEnImpresion": false,
-    "qrPosicion": "abajo-derecha"
+    "qrPosicion": "abajo-derecha",
+    "automatica": false
   },
   "compartir": {
     "qr": true,
@@ -100,10 +172,18 @@
       "urlGaleria": "https://wanna033.github.io/sonria-pues-photobooth/g"
     }
   },
+  "formulario": {
+    "activo": false,
+    "obligatorio": false,
+    "pedirNombre": true,
+    "pedirCorreo": true,
+    "pedirTelefono": true
+  },
   "general": {
     "pin": "1234",
     "inactividadSegundos": 45,
     "pantallaFinalSegundos": 60,
-    "mostrarRecientes": true
+    "mostrarRecientes": true,
+    "carpetaRespaldo": ""
   }
 }

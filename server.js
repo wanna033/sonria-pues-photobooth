@@ -44,7 +44,9 @@ const ID_VALIDO = /^[0-9]{8}-[0-9]{6}-[0-9a-f]{6,16}$/;
 const PUERTO_PUBLICO = PUERTO + 1;
 const HERRAMIENTAS = path.join(RAIZ, 'herramientas');
 const ARCHIVO_VALIDO = /^[a-z0-9_-]{1,40}\.(jpg|png|gif|webm|mp4)$/;
-const RECURSO_VALIDO = /^(logo|logo-claro|fondo)\.(png|jpg|webp)$/;
+/** Imágenes que se suben desde los ajustes: logotipos, fondo, marco de GIF/video y fondos de pantalla verde. */
+const ID_RECURSO = /^(logo|logo-claro|fondo|marco|verde-[1-8])$/;
+const RECURSO_VALIDO = /^(logo|logo-claro|fondo|marco|verde-[1-8])\.(png|jpg|webp)$/;
 const ID_DISENO = /^[a-z0-9][a-z0-9-]{2,70}$/;
 const EXTENSIONES_IMAGEN = ['png', 'jpg', 'webp'];
 /** Archivos de uso interno de la cabina: no se muestran al invitado ni se suben. */
@@ -848,6 +850,84 @@ function espacioEnDisco() {
   }
 }
 
+// ---------------------------------------------------------------- datos de los invitados (formulario opcional)
+
+/** Limpia lo que escribió el invitado (nunca se confía en lo que llega). */
+function limpiarDatosInvitado(datos) {
+  if (!esObjeto(datos)) return null;
+  const texto = (v, max) => String(v ?? '').replace(/[\r\n\t]+/g, ' ').trim().slice(0, max);
+  const limpio = {
+    nombre: texto(datos.nombre, 80),
+    correo: texto(datos.correo, 120).toLowerCase(),
+    telefono: texto(datos.telefono, 30).replace(/[^0-9+() -]/g, ''),
+    acepta: Boolean(datos.acepta),
+  };
+  return limpio.nombre || limpio.correo || limpio.telefono ? limpio : null;
+}
+
+/** Lista de contactos del evento para Excel (UTF-8 con BOM y ";" como separador). */
+function contactosCsv(eventoSlug) {
+  const celda = (v) => {
+    const t = String(v ?? '');
+    // evita que Excel ejecute fórmulas escritas por un invitado
+    const seguro = /^[=+\-@]/.test(t) ? `'${t}` : t;
+    return `"${seguro.replace(/"/g, '""')}"`;
+  };
+  const filas = [['Fecha', 'Hora', 'Nombre', 'Correo', 'Teléfono', 'Acepta', 'Sesión', 'Enlace de sus fotos']];
+  const lista = [...sesiones.entries()].filter(([, s]) => s.meta.eventoSlug === eventoSlug && s.meta.datos).sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  for (const [id, { meta }] of lista) {
+    const f = new Date(meta.fecha);
+    filas.push([f.toLocaleDateString('es-CO'), f.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
+      meta.datos.nombre, meta.datos.correo, meta.datos.telefono, meta.datos.acepta ? 'Sí' : 'No', id, meta.enlace || '']);
+  }
+  const texto = '\ufeff' + filas.map((f) => f.map(celda).join(';')).join('\r\n');
+  return { datos: Buffer.from(texto, 'utf8'), filas: filas.length - 1 };
+}
+
+// ---------------------------------------------------------------- respaldo automático
+// Copia cada archivo a otra carpeta (una memoria USB o una carpeta de OneDrive/Google
+// Drive) en cuanto se guarda: si la computadora falla, las fotos están a salvo.
+
+const estadoRespaldo = { ultimo: '', error: '', copiados: 0 };
+
+function carpetaRespaldo(config) {
+  const carpeta = String(config.general.carpetaRespaldo || '').trim();
+  return carpeta && path.isAbsolute(carpeta) ? carpeta : '';
+}
+
+async function respaldarArchivo(config, sesion, nombre) {
+  const carpeta = carpetaRespaldo(config);
+  if (!carpeta) return;
+  try {
+    const destino = path.join(carpeta, sesion.meta.eventoSlug, sesion.meta.id);
+    await fsp.mkdir(destino, { recursive: true });
+    await fsp.copyFile(path.join(sesion.dir, nombre), path.join(destino, nombre));
+    Object.assign(estadoRespaldo, { ultimo: new Date().toISOString(), error: '' });
+    estadoRespaldo.copiados += 1;
+  } catch (err) {
+    estadoRespaldo.error = err.code === 'ENOENT' ? `No se encuentra la carpeta ${carpeta} (¿se desconectó la memoria USB?)` : err.message;
+    log(`Respaldo: ${estadoRespaldo.error}`);
+  }
+}
+
+/** Copia lo que falte del evento (por ejemplo, al volver a conectar la memoria USB). */
+async function sincronizarRespaldo(config, eventoSlug) {
+  const carpeta = carpetaRespaldo(config);
+  if (!carpeta) throw Object.assign(new Error('Primero escribe la carpeta de respaldo en Ajustes → General'), { codigo: 400 });
+  let copiados = 0;
+  for (const sesion of sesiones.values()) {
+    if (sesion.meta.eventoSlug !== eventoSlug) continue;
+    for (const { nombre } of sesion.meta.archivos) {
+      const destino = path.join(carpeta, eventoSlug, sesion.meta.id, nombre);
+      if (fs.existsSync(destino)) continue;
+      await respaldarArchivo(config, sesion, nombre);
+      if (estadoRespaldo.error) throw Object.assign(new Error(estadoRespaldo.error), { codigo: 409 });
+      copiados++;
+    }
+  }
+  return copiados;
+}
+
 // ---------------------------------------------------------------- exportar un evento (ZIP)
 // ZIP sin compresión (las fotos y videos ya vienen comprimidos): rápido y sin librerías.
 
@@ -874,7 +954,7 @@ function fechaDos(fecha) {
   };
 }
 
-/** @param {{nombre:string, ruta:string, fecha:Date}[]} entradas */
+/** @param {{nombre:string, ruta?:string, datos?:Buffer, fecha:Date}[]} entradas */
 async function crearZip(destino, entradas) {
   const temporal = `${destino}.tmp`;
   const archivo = await fsp.open(temporal, 'w');
@@ -882,7 +962,7 @@ async function crearZip(destino, entradas) {
   let posicion = 0;
   try {
     for (const e of entradas) {
-      const datos = await fsp.readFile(e.ruta);
+      const datos = e.datos || await fsp.readFile(e.ruta);
       const nombre = Buffer.from(e.nombre, 'utf8');
       const { hora, dia } = fechaDos(e.fecha);
       if (posicion + datos.length + 200 > 0xfffffff0) throw Object.assign(new Error('El evento pesa más de 4 GB: exporta desde la carpeta'), { codigo: 413 });
@@ -956,6 +1036,8 @@ async function exportarEvento(eventoSlug) {
     }
   }
   if (!entradas.length) throw Object.assign(new Error('Este evento todavía no tiene fotos'), { codigo: 404 });
+  const contactos = contactosCsv(eventoSlug);
+  if (contactos.filas) entradas.push({ nombre: `${eventoSlug}/contactos.csv`, datos: contactos.datos, fecha: new Date() });
   const carpeta = path.join(DATOS, 'exportaciones');
   await fsp.mkdir(carpeta, { recursive: true });
   const hoy = new Date();
@@ -1196,6 +1278,7 @@ async function manejarApi(req, res, metodo, partes, url) {
       nube: resumenNube(config),
       papel: { ...leerPapel(), controlar: Boolean(config.impresion.controlarPapel), aviso: config.impresion.avisoPapel },
       sesiones: { total: sesiones.size, evento: sesionesEvento },
+      respaldo: { carpeta: carpetaRespaldo(config), ...estadoRespaldo },
       arrancado: INICIO,
     });
   }
@@ -1222,6 +1305,25 @@ async function manejarApi(req, res, metodo, partes, url) {
       iniciarTunel();
     }
     return enviarJSON(res, 200, { ok: true });
+  }
+
+  // lista de contactos del evento (formulario) en un archivo para Excel
+  if (recurso === 'contactos' && metodo === 'POST') {
+    const eventoSlug = slug(leerConfig().evento.nombre);
+    const { datos, filas } = contactosCsv(eventoSlug);
+    if (!filas) return enviarError(res, 404, 'Todavía nadie ha dejado sus datos en este evento');
+    const carpeta = path.join(DATOS, 'exportaciones');
+    await fsp.mkdir(carpeta, { recursive: true });
+    const destino = path.join(carpeta, `${eventoSlug}-contactos-${new Date().toISOString().slice(0, 10)}.csv`);
+    await escribirAtomico(destino, datos);
+    if (process.platform === 'win32') spawn('explorer.exe', ['/select,', destino], { detached: true, stdio: 'ignore' }).unref();
+    return enviarJSON(res, 200, { archivo: path.basename(destino), filas });
+  }
+
+  if (recurso === 'respaldo' && id === 'sincronizar' && metodo === 'POST') {
+    const copiados = await sincronizarRespaldo(leerConfig(), slug(leerConfig().evento.nombre));
+    log(`Respaldo sincronizado: ${copiados} archivos copiados`);
+    return enviarJSON(res, 200, { copiados });
   }
 
   // guarda todo el evento en un ZIP ordenado (para entregarlo al cliente)
@@ -1266,7 +1368,7 @@ async function manejarApi(req, res, metodo, partes, url) {
   if (recurso === 'estadisticas' && metodo === 'GET') {
     const config = leerConfig();
     const eventoSlug = slug(config.evento.nombre);
-    const estad = { total: 0, evento: 0, impresiones: 0, impresionesEvento: 0, porModo: {} };
+    const estad = { total: 0, evento: 0, impresiones: 0, impresionesEvento: 0, porModo: {}, porModoEvento: {}, porHora: {}, contactos: 0 };
     for (const { meta } of sesiones.values()) {
       estad.total += 1;
       estad.impresiones += meta.impresiones || 0;
@@ -1274,6 +1376,11 @@ async function manejarApi(req, res, metodo, partes, url) {
       if (meta.eventoSlug === eventoSlug) {
         estad.evento += 1;
         estad.impresionesEvento += meta.impresiones || 0;
+        estad.porModoEvento[meta.modo] = (estad.porModoEvento[meta.modo] || 0) + 1;
+        // sesiones por hora del día (para ver los momentos de más movimiento)
+        const hora = new Date(meta.fecha).getHours();
+        estad.porHora[hora] = (estad.porHora[hora] || 0) + 1;
+        if (meta.datos) estad.contactos += 1;
       }
     }
     return enviarJSON(res, 200, estad);
@@ -1298,7 +1405,7 @@ async function manejarApi(req, res, metodo, partes, url) {
     return enviarJSON(res, 200, { carpeta });
   }
 
-  if (recurso === 'recursos' && id && /^(logo|logo-claro|fondo)$/.test(id)) {
+  if (recurso === 'recursos' && id && ID_RECURSO.test(id)) {
     if (metodo === 'PUT') {
       const tipo = String(req.headers['content-type'] || '');
       const ext = tipo.includes('png') ? 'png' : tipo.includes('webp') ? 'webp' : tipo.includes('jpeg') ? 'jpg' : null;
@@ -1434,6 +1541,8 @@ async function manejarApi(req, res, metodo, partes, url) {
           impresiones: 0,
         },
       };
+      const datosInvitado = limpiarDatosInvitado(cuerpo.datos);
+      if (datosInvitado) sesion.meta.datos = datosInvitado;
       await guardarMeta(sesion);
       sesiones.set(nuevo, sesion);
       log(`Nueva sesión ${nuevo} (${sesion.meta.modo})`);
@@ -1449,6 +1558,7 @@ async function manejarApi(req, res, metodo, partes, url) {
       if (!ARCHIVO_VALIDO.test(extra)) return enviarError(res, 400, 'Nombre de archivo inválido');
       const datos = await leerCuerpo(req, 300 * MB);
       await escribirAtomico(path.join(sesion.dir, extra), datos);
+      respaldarArchivo(leerConfig(), sesion, extra); // en segundo plano
       sesion.meta.archivos = sesion.meta.archivos.filter((a) => a.nombre !== extra);
       sesion.meta.archivos.push({ nombre: extra, tipo: tipoDeArchivo(extra), bytes: datos.length });
       if (!sesion.meta.principal && !ARCHIVOS_INTERNOS.has(extra)) sesion.meta.principal = extra;

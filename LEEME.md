@@ -82,7 +82,16 @@ misma proporción que la cámara (3:2 o 16:9) para que no se recorten caras.
 | **Compartir** | En la página de descarga, botón para enviar la foto directo a WhatsApp, Instagram, etc. |
 | **Pestaña Estado** | Revisión antes del evento: cámara, impresora (y sus errores: sin papel, atasco…), papel, QR por internet, fotos en la nube y disco. |
 | **Contador de papel** | Descuenta una hoja por copia, avisa cuando queda poco y deja de ofrecer imprimir cuando se acaba. |
-| **Exportar evento (ZIP)** | Un archivo ordenado (impresiones, GIF y boomerang, videos, fotos) para entregar al cliente. |
+| **Exportar evento (ZIP)** | Un archivo ordenado (impresiones, GIF y boomerang, videos, fotos y contactos) para entregar al cliente. |
+| **Pantalla verde** | Reemplaza la tela verde (o azul) por el fondo que elijas, en vivo y en fotos, GIF, boomerang y video. Con varios fondos, el invitado elige. |
+| **Presentación en vivo** | Las fotos del evento en una pantalla o TV, a medida que se toman (las nuevas con "¡Nueva!"), con el QR de la galería. |
+| **Formulario de datos** | Para activaciones de marca: nombre, correo, celular y autorización antes de las fotos; se exporta a Excel. |
+| **Sugerencias de pose** | Una idea divertida durante cada cuenta regresiva ("¡Cara de sorpresa!"), editable. |
+| **Impresión automática** | La foto se imprime sola al terminar, sin tocar "Imprimir". |
+| **Marco en GIF y video** | Un PNG con tu marca encima de cada cuadro de GIF, boomerang y video. |
+| **Respaldo automático** | Cada foto se copia al instante a una memoria USB o a OneDrive/Google Drive. |
+| **Estadísticas por hora** | Gráfica de sesiones por hora del evento. |
+| **Se recupera sola** | Si el servidor se cierra o se traba, la aplicación lo vuelve a abrir en unos 10 segundos. |
 | **Tu marca** | Nombre, frase, 3 colores, logotipo, fondo e imagen de fondo personalizados. |
 | **Asistente** | Cuenta regresiva con pitidos, obturador, destello y voz en español. |
 | **Pantalla de inicio** | Muestra un collage con las últimas fotos del evento. |
@@ -107,7 +116,13 @@ Casi todo se cambia desde los **Ajustes**, sin tocar el código:
 | Tus tiras y postales, y el tamaño de la hoja impresa | Ajustes → Mis diseños |
 | Copias, prueba de impresión, papel, dirección del QR | Ajustes → Impresión y QR |
 | Guardar fotos en internet (QR permanentes), QR impreso, galería del evento | Ajustes → Impresión y QR |
-| Revisar que todo funcione, cargar papel, exportar el evento | Ajustes → **Estado** |
+| Revisar que todo funcione, cargar papel, exportar el evento, abrir la presentación | Ajustes → **Estado** |
+| Pantalla verde: color, tolerancia, fondos y prueba en vivo | Ajustes → **Pantalla verde** |
+| Formulario de datos y exportar contactos | Ajustes → **Formulario** (textos en Textos) |
+| Sugerencias de pose | Ajustes → Cámara |
+| Marco para GIF, boomerang y video | Ajustes → Diseño |
+| Impresión automática | Ajustes → Impresión y QR |
+| Carpeta de respaldo (USB / OneDrive) | Ajustes → General |
 | PIN, tiempos de inactividad, fotos recientes en el inicio | Ajustes → General |
 
 En los textos, lo que va entre llaves se reemplaza solo: `{n}`, `{total}`, `{segundos}`,
@@ -206,6 +221,14 @@ El mismo código funciona publicado como página web, por ejemplo en GitHub Page
 
 La cabina detecta sola si hay servidor detrás; no hay que configurar nada.
 
+## Si algo falla durante el evento
+
+- Si el servidor de la cabina se cierra o se traba, la aplicación lo **vuelve a abrir sola** en
+  unos 10 segundos; mientras tanto aparece arriba "Reconectando con la cabina…". No la cierres.
+- Si configuraste una carpeta de respaldo y la memoria USB se desconectó, al volver a conectarla
+  pulsa **💾 Copiar ahora lo que falte del evento** (Ajustes → General).
+- Los GIF se crean en segundo plano: la pantalla sigue fluida aunque la computadora sea sencilla.
+
 ## Atajos
 
 - **Ajustes:** engrane casi invisible arriba a la derecha del inicio, o `Ctrl + Shift + A`.
@@ -240,6 +263,31 @@ En la misma pestaña se ve cuál está en uso.
 Canon (*EOS Webcam Utility*), Nikon (*Webcam Utility*), Sony (*Imaging Edge Webcam*) y Fujifilm
 (*X Webcam*) convierten tu cámara en webcam. Instala la utilidad, conecta por USB y elígela en
 *Ajustes → Cámara*. Sin cámara, la cabina usa una **cámara de demostración** para que puedas probarla.
+
+## Pantalla verde
+
+1. Pon detrás de los invitados una tela verde (o azul) lisa, **bien iluminada y sin sombras**.
+2. En *Ajustes → Pantalla verde*, actívala, elige el color de la tela y agrega uno o varios
+   fondos (imágenes horizontales, ideal 1920×1080).
+3. Mira la **prueba en vivo** y mueve la **tolerancia**: súbela si queda borde verde alrededor
+   de las personas; bájala si se borra parte de la ropa o el pelo.
+
+Con un solo fondo se usa siempre; con varios, el invitado elige el suyo antes de posar. El fondo
+nunca sale al revés aunque la vista previa esté en espejo. Que nadie vista del color de la tela.
+
+## Presentación en vivo (pantalla o TV)
+
+Con la cabina abierta, doble clic en **"Sonría Pues - Presentación"** (o *Ajustes → Estado →
+🖥️ Presentación en vivo*). Arrastra la ventana a la TV y presiona **F11**. Muestra las fotos,
+GIF y videos del evento; las nuevas salen enseguida con la etiqueta "¡Nueva!". Si las fotos se
+guardan en internet, también muestra el QR con la galería de todo el evento.
+
+## Formulario de datos (activaciones de marca)
+
+En *Ajustes → Formulario* se activa un paso antes de las fotos donde el invitado deja su nombre,
+correo y celular y acepta la autorización (puede ser obligatorio). Los datos se guardan **sólo en
+esta computadora**, junto a cada sesión. **📋 Exportar contactos** crea un archivo para Excel con
+fecha, datos, autorización y el enlace de las fotos de cada persona.
 
 ## Antes de cada evento
 
@@ -278,11 +326,13 @@ Lo que quitas desde la galería se mueve a `datos\papelera` (no se borra).
 | `public\index.html`, `public\css\app.css` | Pantallas y estilos de la cabina. |
 | `public\js\app.js` | Flujo de la sesión (inicio → modo → diseño → filtro → fotos → stickers → final). |
 | `public\js\plantillas.js` | Plantillas de impresión (medidas en píxeles a 300 ppp). Aquí puedes agregar las tuyas. |
-| `public\js\gif.js`, `public\js\qr.js` | Generadores propios de GIF animado y códigos QR. |
+| `public\js\gif.js`, `gif-trabajador.js`, `public\js\qr.js` | Generadores propios de GIF animado (en segundo plano) y códigos QR. |
+| `public\presentacion.html`, `public\js\presentacion.js` | Presentación en vivo para una pantalla o TV. |
+| `lanzador\SonriaPues.cs` | La aplicación "Sonria Pues.exe" (se compila con `lanzador\compilar.bat`). |
 | `public\js\camara.js`, `stickers.js`, `ajustes.js`, `sonidos.js`, `filtros.js` | Cámara, stickers, panel de ajustes, sonidos y filtros. |
 
 ## Ideas para después
 
 - Envío por correo o WhatsApp (requiere internet y una cuenta de un servicio de envío).
-- Pantalla verde / quitar el fondo.
+- Quitar el fondo sin tela verde (con inteligencia artificial).
 - Control directo de cámaras réflex (disparo a resolución completa de la cámara).

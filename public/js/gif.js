@@ -260,3 +260,34 @@ export async function crearGif(cuadros, { retrasoMs = 450, alProgreso = () => {}
   gif.byte(0x3b);
   return new Blob([gif.resultado()], { type: 'image/gif' });
 }
+
+/**
+ * Igual que crearGif, pero en segundo plano (la pantalla no se congela).
+ * Si el navegador no permite el trabajo en segundo plano, se hace aquí mismo.
+ */
+export function crearGifEnSegundoPlano(cuadros, { retrasoMs = 450, alProgreso = () => {} } = {}) {
+  let trabajador;
+  try {
+    trabajador = new Worker(new URL('./gif-trabajador.js', import.meta.url), { type: 'module' });
+  } catch {
+    return crearGif(cuadros, { retrasoMs, alProgreso });
+  }
+  return new Promise((resolve, reject) => {
+    const enEstaPagina = () => {
+      trabajador.terminate();
+      crearGif(cuadros, { retrasoMs, alProgreso }).then(resolve, reject);
+    };
+    trabajador.onmessage = ({ data }) => {
+      if (data.progreso !== undefined) return alProgreso(data.progreso);
+      trabajador.terminate();
+      if (data.gif) resolve(data.gif);
+      else reject(new Error(data.error));
+    };
+    trabajador.onerror = (e) => {
+      e.preventDefault();
+      enEstaPagina();
+    };
+    // se copian (no se transfieren) para poder rehacerlo aquí si el trabajador falla
+    trabajador.postMessage({ cuadros, retrasoMs });
+  });
+}

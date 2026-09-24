@@ -4,8 +4,48 @@
  * una imagen de demostración para que la cabina se pueda probar igual.
  */
 
+/**
+ * Pantalla verde (o azul): reemplaza el color del fondo por la imagen elegida.
+ * "clave" mide cuánto domina el verde sobre el rojo y el azul; con orillas
+ * suaves y quitando el reflejo verde del pelo y la ropa.
+ * @param {Uint8ClampedArray} px cuadro de la cámara (se modifica)
+ * @param {Uint8ClampedArray} fondo imagen de fondo del mismo tamaño
+ */
+export function aplicarCroma(px, fondo, { color = 'verde', tolerancia = 50 } = {}) {
+  const azul = color === 'azul';
+  const umbral = 100 - Math.max(0, Math.min(100, tolerancia)) * 0.9; // más tolerancia = quita más
+  const suave = 38;
+  const desde = umbral - suave;
+  for (let i = 0; i < px.length; i += 4) {
+    const r = px[i];
+    const g = px[i + 1];
+    const b = px[i + 2];
+    const clave = azul ? b - (r > g ? r : g) : g - (r > b ? r : b);
+    if (clave <= 0 || clave <= desde) {
+      // persona (y todo lo gris o blanco): sólo se le quita el tinte verde de las orillas
+      if (clave > 0) {
+        if (azul) px[i + 2] = r > g ? r : g;
+        else px[i + 1] = r > b ? r : b;
+      }
+      continue;
+    }
+    const a = clave >= umbral ? 1 : (clave - desde) / suave;
+    let fr = r;
+    let fg = g;
+    let fb = b;
+    if (azul) fb = r > g ? r : g;
+    else fg = r > b ? r : b;
+    px[i] = fr + (fondo[i] - fr) * a;
+    px[i + 1] = fg + (fondo[i + 1] - fg) * a;
+    px[i + 2] = fb + (fondo[i + 2] - fb) * a;
+  }
+}
+
 export class Camara {
   constructor() {
+    /** Pantalla verde activa: { fondo: imagen, color, tolerancia } o null. */
+    this.croma = null;
+    this.lienzosCroma = new Map(); // un lienzo de trabajo por tamaño (vista previa y fotos)
     this.stream = null;
     this.demo = false;
     this.animacionDemo = 0;
@@ -138,6 +178,7 @@ export class Camara {
 
   /** Dibuja el cuadro actual (cubriendo w×h) en un contexto. */
   dibujar(ctx, w, h, { filtroCss = 'none', espejo = false } = {}) {
+    if (this.croma?.fondo) return this.dibujarConCroma(ctx, w, h, { filtroCss, espejo });
     ctx.save();
     ctx.filter = filtroCss || 'none';
     if (espejo) {
@@ -151,6 +192,54 @@ export class Camara {
     const ch = h * escala;
     ctx.drawImage(this.fuente, (sw - cw) / 2, (sh - ch) / 2, cw, ch, 0, 0, w, h);
     ctx.restore();
+  }
+
+  /**
+   * Cuadro con la pantalla verde reemplazada. El espejo se aplica sólo a la
+   * persona: el fondo nunca sale al revés. El filtro se aplica al final, a todo.
+   */
+  dibujarConCroma(ctx, w, h, { filtroCss = 'none', espejo = false }) {
+    const clave = `${w}x${h}`;
+    let trabajo = this.lienzosCroma.get(clave);
+    if (!trabajo) {
+      const lienzo = document.createElement('canvas');
+      lienzo.width = w;
+      lienzo.height = h;
+      trabajo = { lienzo, ctx: lienzo.getContext('2d', { willReadFrequently: true }), fondo: null, imagen: null };
+      this.lienzosCroma.set(clave, trabajo);
+    }
+    const t = trabajo.ctx;
+    // el fondo se prepara una sola vez por tamaño
+    if (trabajo.imagen !== this.croma.fondo) {
+      const img = this.croma.fondo;
+      const escala = Math.max(w / img.width, h / img.height);
+      t.drawImage(img, (w - img.width * escala) / 2, (h - img.height * escala) / 2, img.width * escala, img.height * escala);
+      trabajo.fondo = t.getImageData(0, 0, w, h).data;
+      trabajo.imagen = img;
+    }
+    t.save();
+    if (espejo) {
+      t.translate(w, 0);
+      t.scale(-1, 1);
+    }
+    const sw = this.ancho;
+    const sh = this.alto;
+    const escala = Math.min(sw / w, sh / h);
+    t.drawImage(this.fuente, (sw - w * escala) / 2, (sh - h * escala) / 2, w * escala, h * escala, 0, 0, w, h);
+    t.restore();
+    const cuadro = t.getImageData(0, 0, w, h);
+    aplicarCroma(cuadro.data, trabajo.fondo, this.croma);
+    t.putImageData(cuadro, 0, 0);
+    ctx.save();
+    ctx.filter = filtroCss || 'none';
+    ctx.drawImage(trabajo.lienzo, 0, 0, w, h);
+    ctx.restore();
+  }
+
+  /** Activa o quita la pantalla verde. */
+  usarCroma(croma) {
+    this.croma = croma?.fondo ? croma : null;
+    if (!this.croma) this.lienzosCroma.clear();
   }
 
   async listar() {

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sonría Pues · Presentación</title>
+  <link rel="icon" href="marca/icono.png" type="image/png">
+  <style>
+    /* Presentación en vivo: las fotos del evento en una pantalla o TV, a medida que se toman. */
+    :root { --primario: #d6a545; --secundario: #184659; --fondo: #0f1417; --texto: #fff; }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html, body { margin: 0; height: 100%; overflow: hidden; cursor: none; }
+    body {
+      font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+      color: var(--texto);
+      background: radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--primario) 30%, var(--fondo)) 0%, var(--fondo) 70%);
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+    }
+    header { display: flex; align-items: center; justify-content: center; gap: 3vmin; padding: 2.5vmin 4vmin 1vmin; }
+    header img { max-height: 11vmin; max-width: 30vw; object-fit: contain; }
+    header h1 { margin: 0; font-size: 5vmin; letter-spacing: -0.02em; }
+    main { position: relative; margin: 1vmin 4vmin; }
+    .diapositiva {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      opacity: 0;
+      transform: scale(1.03);
+      transition: opacity 1s ease, transform 1.2s ease;
+    }
+    .diapositiva.visible { opacity: 1; transform: none; }
+    .marco {
+      position: relative;
+      max-width: 100%;
+      max-height: 100%;
+      padding: 1.4vmin;
+      background: #fff;
+      border-radius: 1.2vmin;
+      box-shadow: 0 3vmin 8vmin rgba(0, 0, 0, 0.45);
+      display: flex;
+    }
+    .marco img, .marco video { display: block; max-width: calc(92vw - 2.8vmin); max-height: calc(100vh - 34vmin); object-fit: contain; border-radius: 0.6vmin; }
+    .nueva {
+      position: absolute;
+      top: -2.2vmin;
+      right: -2.2vmin;
+      padding: 1vmin 2.4vmin;
+      border-radius: 999px;
+      background: var(--primario);
+      color: #1d1a16;
+      font-weight: 800;
+      font-size: 3vmin;
+      box-shadow: 0 1vmin 3vmin rgba(0, 0, 0, 0.35);
+      animation: rebote 1.2s ease both;
+    }
+    @keyframes rebote { 0% { transform: scale(0); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
+    .vacio { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; font-size: 4vmin; opacity: 0.85; }
+    footer { display: flex; align-items: center; justify-content: space-between; gap: 3vmin; padding: 1vmin 4vmin 3vmin; }
+    .eslogan { margin: 0; font-size: 3.4vmin; font-weight: 700; }
+    .contador { margin: 0; font-size: 2.4vmin; opacity: 0.75; }
+    .qr { display: flex; align-items: center; gap: 2vmin; padding: 1.4vmin; border-radius: 1.6vmin; background: #fff; color: #1d1a16; font-weight: 700; font-size: 2.2vmin; max-width: 40vmin; }
+    .qr div { width: 14vmin; aspect-ratio: 1; flex: 0 0 auto; }
+    .qr svg { display: block; width: 100%; height: 100%; }
+    .aviso { position: fixed; left: 50%; bottom: 2vmin; transform: translateX(-50%); padding: 1vmin 2.4vmin; border-radius: 999px; background: rgba(0, 0, 0, 0.6); font-size: 1.8vmin; transition: opacity 1s; }
+  </style>
+</head>
+<body>
+  <header>
+    <img id="logo" alt="" hidden>
+    <h1 id="evento"></h1>
+  </header>
+  <main id="escenario">
+    <p class="vacio" id="vacio">Las fotos aparecerán aquí en cuanto se tomen 📸</p>
+  </main>
+  <footer>
+    <div>
+      <p class="eslogan" id="eslogan"></p>
+      <p class="contador" id="contador"></p>
+    </div>
+    <div class="qr" id="qr" hidden>
+      <div id="qr-codigo"></div>
+      <span>Escanea para ver todas las fotos del evento</span>
+    </div>
+  </footer>
+  <p class="aviso" id="aviso">Presiona F11 para pantalla completa · arrastra esta ventana a la TV</p>
+  <p class="aviso" id="sin-conexion" hidden>⚠️ Esperando a la cabina…</p>
+  <script type="module" src="js/presentacion.js"></script>
+</body>
+</html>

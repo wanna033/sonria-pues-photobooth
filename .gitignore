@@ -12,3 +12,6 @@ desktop.ini
 
 # programa de Cloudflare para el QR por internet (se descarga con "Activar QR por internet.bat")
 herramientas/
+
+# versión anterior de la aplicación (queda al actualizarla mientras estaba abierta)
+*.anterior.exe

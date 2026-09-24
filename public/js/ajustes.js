@@ -51,6 +51,21 @@ const SECCIONES = [
       { ruta: 'captura.sonidos', tipo: 'bool', etiqueta: 'Sonidos (pitidos y obturador)' },
       { ruta: 'captura.voz', tipo: 'bool', etiqueta: 'Asistente de voz', ayuda: 'Usa las voces en español instaladas en Windows.' },
       { ruta: 'captura.permitirRepetir', tipo: 'bool', etiqueta: 'Permitir repetir fotos' },
+      { h: 'Sugerencias de pose' },
+      { ruta: 'captura.sugerenciasPose', tipo: 'bool', etiqueta: 'Sugerir una pose antes de cada foto', ayuda: 'Durante la cuenta regresiva aparece una idea divertida ("¡Cara de sorpresa!"). Así cada foto sale distinta.' },
+      { ruta: 'captura.poses', tipo: 'lineas', etiqueta: 'Poses', ayuda: 'Una por línea. Se eligen al azar sin repetir.' },
+    ],
+  },
+  {
+    id: 'verde',
+    titulo: 'Pantalla verde',
+    campos: [
+      { tipo: 'nota', texto: 'Pon una tela o pared verde (o azul) detrás de los invitados, bien iluminada y sin arrugas. La cabina reemplaza ese color por el fondo que elijas, en las fotos, GIF, boomerang y video. Evita que los invitados vistan de ese color.' },
+      { ruta: 'pantallaVerde.activo', tipo: 'bool', etiqueta: 'Usar pantalla verde' },
+      { ruta: 'pantallaVerde.color', tipo: 'select', etiqueta: 'Color de la tela', opciones: [['verde', 'Verde (croma)'], ['azul', 'Azul']] },
+      { ruta: 'pantallaVerde.tolerancia', tipo: 'rango', min: 0, max: 100, paso: 5, etiqueta: 'Tolerancia', ayuda: 'Súbela si queda borde verde alrededor de las personas; bájala si se borra parte de la ropa o el pelo.' },
+      { tipo: 'fondos-verde' },
+      { tipo: 'prueba-croma' },
     ],
   },
   {
@@ -96,11 +111,26 @@ const SECCIONES = [
       { ruta: 'stickers.habilitados', tipo: 'bool', etiqueta: 'Decorar con stickers antes de imprimir' },
       { ruta: 'stickers.frases', tipo: 'lineas', etiqueta: 'Frases', ayuda: 'Una por línea. Aparecen como globos de texto.' },
       { ruta: 'stickers.emojis', tipo: 'emojis', etiqueta: 'Emojis', ayuda: 'Separados por espacios. Puedes pegar los que quieras; se muestran en ese orden.' },
+      { h: 'Marco en GIF, boomerang y video' },
+      { ruta: 'marca.marcoAnimado', tipo: 'recurso', recurso: 'marco', etiqueta: 'Marco (PNG)', ayuda: 'Imagen PNG con el centro transparente, en formato horizontal 16:9 (por ejemplo 1920×1080). Se pone encima de cada cuadro de los GIF, boomerangs y videos.' },
       { h: 'Marca de agua en GIF y video' },
       { ruta: 'marca.marcaDeAgua', tipo: 'bool', etiqueta: 'Poner la marca de agua', ayuda: 'El texto se edita en la pestaña Textos.' },
     ],
   },
   { id: 'textos', titulo: 'Textos', especial: 'textos' },
+  {
+    id: 'formulario',
+    titulo: 'Formulario',
+    campos: [
+      { tipo: 'nota', texto: 'Para activaciones de marca: antes de tomarse las fotos, el invitado deja sus datos y acepta la autorización. Se guardan sólo en esta computadora, junto a su sesión. Los textos se cambian en la pestaña Textos.' },
+      { ruta: 'formulario.activo', tipo: 'bool', etiqueta: 'Pedir datos antes de las fotos' },
+      { ruta: 'formulario.obligatorio', tipo: 'bool', etiqueta: 'Obligatorio (sin botón "Omitir")' },
+      { ruta: 'formulario.pedirNombre', tipo: 'bool', etiqueta: 'Pedir nombre' },
+      { ruta: 'formulario.pedirCorreo', tipo: 'bool', etiqueta: 'Pedir correo' },
+      { ruta: 'formulario.pedirTelefono', tipo: 'bool', etiqueta: 'Pedir celular' },
+      { tipo: 'accion', etiqueta: 'Contactos', boton: '📋 Exportar contactos del evento (Excel)', accion: 'exportarContactos', ayuda: 'Crea un archivo .csv que abre Excel, con fecha, datos, autorización y el enlace de las fotos de cada persona. También va dentro del ZIP del evento.' },
+    ],
+  },
   {
     id: 'impresion',
     titulo: 'Impresión y QR',
@@ -109,6 +139,7 @@ const SECCIONES = [
       { ruta: 'impresion.habilitada', tipo: 'bool', etiqueta: 'Permitir imprimir' },
       { ruta: 'impresion.copiasMaximas', tipo: 'numero', min: 1, max: 10, etiqueta: 'Copias máximas por sesión' },
       { ruta: 'impresion.copiasPorDefecto', tipo: 'numero', min: 1, max: 10, etiqueta: 'Copias sugeridas' },
+      { ruta: 'impresion.automatica', tipo: 'bool', etiqueta: 'Imprimir automáticamente', ayuda: 'La foto se imprime sola al terminar (con las copias sugeridas), sin que el invitado toque "Imprimir".' },
       { tipo: 'accion', etiqueta: 'Prueba', boton: '🖨️ Imprimir página de prueba', accion: 'imprimirPrueba', ayuda: 'Imprime la plantilla predeterminada en la impresora predeterminada de Windows. La hoja mide exactamente lo que la plantilla (las integradas, 10×15 cm; las tuyas, lo que indiques en "Mis diseños"). Pon ese mismo tamaño de papel en la impresora y sin bordes.' },
       { h: 'Papel' },
       { ruta: 'impresion.controlarPapel', tipo: 'bool', etiqueta: 'Llevar la cuenta del papel', ayuda: 'Descuenta una hoja por cada copia impresa, avisa en el inicio cuando queda poco y deja de ofrecer la impresión cuando se acaba (el QR sigue funcionando).' },
@@ -142,6 +173,9 @@ const SECCIONES = [
       { ruta: 'general.inactividadSegundos', tipo: 'numero', min: 15, max: 600, etiqueta: 'Volver al inicio tras inactividad (s)' },
       { ruta: 'general.pantallaFinalSegundos', tipo: 'numero', min: 15, max: 600, etiqueta: 'Tiempo en la pantalla final (s)' },
       { ruta: 'general.mostrarRecientes', tipo: 'bool', etiqueta: 'Mostrar fotos recientes en el inicio' },
+      { h: 'Respaldo automático' },
+      { ruta: 'general.carpetaRespaldo', tipo: 'texto', etiqueta: 'Carpeta de respaldo', ayuda: 'Cada foto se copia también aquí en cuanto se toma. Usa una memoria USB (por ejemplo E:\\Respaldo Sonria) o una carpeta de OneDrive o Google Drive. Déjala vacía para no respaldar.' },
+      { tipo: 'accion', etiqueta: 'Respaldo', boton: '💾 Copiar ahora lo que falte del evento', accion: 'sincronizarRespaldo', ayuda: 'Útil si la memoria USB estuvo desconectada un rato.' },
     ],
   },
   { id: 'galeria', titulo: 'Galería', especial: 'galeria' },
@@ -251,6 +285,7 @@ export class Ajustes {
           this.acciones.aviso?.('☁️ Reintentando las subidas pendientes');
         }),
         boton('📦 Exportar evento (ZIP)', () => this.exportarEvento()),
+        boton('🖥️ Presentación en vivo', () => window.open('/presentacion.html', 'presentacion', 'popup,width=1280,height=720')),
         boton('📂 Abrir carpeta de fotos', () => this.api('/api/abrir-carpeta', { method: 'POST' }))),
       el('h3', {}, 'Papel en la impresora'),
       this.controlPapel(),
@@ -336,6 +371,12 @@ export class Ajustes {
         `${gb.toFixed(1)} GB libres${gb < 10 ? ' · libera espacio o exporta y borra eventos viejos' : ''}`));
     }
 
+    // respaldo automático
+    const r = e.respaldo;
+    if (!r?.carpeta) lista.push(tarjeta('info', 'Respaldo', 'Sin respaldo automático. Puedes activarlo en General (una memoria USB o OneDrive).'));
+    else if (r.error) lista.push(tarjeta('mal', 'Respaldo', r.error));
+    else lista.push(tarjeta('ok', 'Respaldo', `Copiando a ${r.carpeta}${r.copiados ? ` · ${r.copiados} archivos desde que se abrió` : ''}`));
+
     lista.push(tarjeta('info', 'Sesiones', `${e.sesiones.evento} en este evento · ${e.sesiones.total} en total`));
     return lista;
   }
@@ -363,6 +404,106 @@ export class Ajustes {
         },
       }, '🧻 Cargué papel'),
       nota);
+  }
+
+  /** Fondos de la pantalla verde: hasta 8 imágenes; si hay más de uno, el invitado elige. */
+  campoFondosVerde() {
+    const fondos = this.borrador.pantallaVerde.fondos;
+    const idDe = (url) => (/recursos\/(verde-[1-8])\./.exec(url) || [])[1];
+    const lista = el('div', { class: 'fondos-verde' });
+    const archivo = el('input', {
+      type: 'file',
+      accept: 'image/png,image/jpeg,image/webp',
+      hidden: true,
+      onchange: async (e) => {
+        const f = e.target.files[0];
+        e.target.value = '';
+        if (!f) return;
+        const usados = new Set(fondos.map(idDe));
+        const id = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => `verde-${n}`).find((x) => !usados.has(x));
+        if (!id) return this.acciones.aviso?.('Máximo 8 fondos');
+        try {
+          const r = await this.api(`/api/recursos/${id}`, { method: 'PUT', body: f, headers: { 'Content-Type': f.type } });
+          fondos.push(r.url);
+          pintar();
+        } catch (err) {
+          this.acciones.aviso?.(err.message);
+        }
+      },
+    });
+    const pintar = () => {
+      lista.replaceChildren(
+        ...fondos.map((url, i) => el('figure', {},
+          el('img', { src: url, alt: `Fondo ${i + 1}` }),
+          el('button', {
+            class: 'boton-secundario',
+            type: 'button',
+            onclick: async () => {
+              const id = idDe(url);
+              if (id) await this.api(`/api/recursos/${id}`, { method: 'DELETE' }).catch(() => {});
+              fondos.splice(fondos.indexOf(url), 1);
+              pintar();
+            },
+          }, 'Quitar'))),
+        fondos.length < 8 ? el('button', { class: 'boton-secundario fondo-agregar', type: 'button', onclick: () => archivo.click() }, '＋ Agregar fondo') : null,
+      );
+    };
+    pintar();
+    return el('div', { class: 'campo' }, el('label', {}, 'Fondos'), el('div', {}, lista, archivo),
+      el('p', { class: 'ayuda' }, 'Imágenes horizontales (ideal 1920×1080). Con un solo fondo se usa siempre; con varios, el invitado elige el suyo.'));
+  }
+
+  /** Vista en vivo de la pantalla verde con los ajustes que se están editando. */
+  campoPruebaCroma() {
+    const lienzo = el('canvas', { class: 'prueba-croma', width: 480, height: 270, 'aria-label': 'Vista previa de la pantalla verde' });
+    const ctx = lienzo.getContext('2d');
+    let url = null;
+    let imagen = null;
+    const reloj = setInterval(async () => {
+      if (!lienzo.isConnected) return clearInterval(reloj);
+      const pv = this.borrador.pantallaVerde;
+      const h = Math.round((480 * this.camara.alto) / this.camara.ancho);
+      if (lienzo.height !== h) lienzo.height = h;
+      if (!pv.fondos[0]) {
+        ctx.fillStyle = '#222';
+        ctx.fillRect(0, 0, 480, h);
+        ctx.fillStyle = '#fff';
+        ctx.font = '600 18px "Segoe UI", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Agrega un fondo para ver la prueba', 240, h / 2);
+        return;
+      }
+      if (pv.fondos[0] !== url) {
+        url = pv.fondos[0];
+        imagen = await cargarImagen(url);
+      }
+      if (!imagen) return;
+      // se activa sólo mientras se dibuja este cuadro: la cabina no se ve afectada
+      const antes = this.camara.croma;
+      this.camara.croma = { fondo: imagen, color: pv.color, tolerancia: pv.tolerancia };
+      this.camara.dibujar(ctx, 480, h, { espejo: true });
+      this.camara.croma = antes;
+    }, 1000 / 15);
+    return el('div', { class: 'campo' }, el('label', {}, 'Prueba en vivo'), lienzo,
+      el('p', { class: 'ayuda' }, 'Usa el primer fondo. Ajusta la tolerancia mirando esta vista.'));
+  }
+
+  async exportarContactos() {
+    try {
+      const r = await this.api('/api/contactos', { method: 'POST', json: {} });
+      this.acciones.aviso?.(`📋 ${r.filas} contactos guardados en ${r.archivo}. Se abrió la carpeta.`, 8000);
+    } catch (err) {
+      this.acciones.aviso?.(err.message, 6000);
+    }
+  }
+
+  async sincronizarRespaldo() {
+    try {
+      const r = await this.api('/api/respaldo/sincronizar', { method: 'POST', json: {} });
+      this.acciones.aviso?.(r.copiados ? `💾 ${r.copiados} archivos copiados al respaldo` : '💾 El respaldo ya estaba completo');
+    } catch (err) {
+      this.acciones.aviso?.(err.message, 7000);
+    }
   }
 
   async renovarTunel() {
@@ -567,6 +708,9 @@ export class Ajustes {
   crearCampo(campo) {
     if (campo.h) return el('h3', {}, campo.h);
     if (campo.tipo === 'probar-nube') return this.campoProbarNube();
+    if (campo.tipo === 'nota') return el('p', { class: 'nota' }, campo.texto);
+    if (campo.tipo === 'fondos-verde') return this.campoFondosVerde();
+    if (campo.tipo === 'prueba-croma') return this.campoPruebaCroma();
     if (campo.tipo === 'papel') {
       if (this.modoWeb) return el('span');
       return el('div', { class: 'campo' }, el('label', {}, 'Hojas cargadas'), this.controlPapel(),
@@ -713,8 +857,25 @@ export class Ajustes {
         break;
       }
       case 'accion':
-        control = el('button', { class: 'boton-secundario', type: 'button', onclick: () => this.acciones[campo.accion]?.(this.borrador) }, campo.boton);
+        control = el('button', {
+          class: 'boton-secundario',
+          type: 'button',
+          onclick: () => (this[campo.accion] ? this[campo.accion]() : this.acciones[campo.accion]?.(this.borrador)),
+        }, campo.boton);
         break;
+      case 'rango': {
+        const salida = el('output', { class: 'rango-valor' }, String(valor));
+        control = el('div', { class: 'rango' },
+          el('input', {
+            type: 'range', id, min: campo.min, max: campo.max, step: campo.paso || 1, value: valor,
+            oninput: (e) => {
+              guardar(Number(e.target.value));
+              salida.textContent = e.target.value;
+            },
+          }),
+          salida);
+        break;
+      }
       default:
         control = el('span');
     }
@@ -737,7 +898,8 @@ export class Ajustes {
     }
     c.append(el('h3', {}, 'Estadísticas'));
     const cajaEstad = el('div', { class: 'estadisticas' });
-    c.append(cajaEstad);
+    const cajaHoras = el('div');
+    c.append(cajaEstad, cajaHoras);
     c.append(el('div', { class: 'fila-botones', style: 'margin:16px 0' },
       el('button', { class: 'boton-secundario', onclick: () => this.api('/api/abrir-carpeta', { method: 'POST' }) }, '📂 Abrir carpeta de fotos del evento'),
       el('button', { class: 'boton-secundario', onclick: () => this.exportarEvento() }, '📦 Exportar evento (ZIP)'),
@@ -764,11 +926,24 @@ export class Ajustes {
         this.api(`/api/sesiones?limite=${todos ? 300 : 120}${todos ? '&evento=todos' : ''}`),
       ]);
       const numero = (n, t) => el('div', {}, el('strong', {}, String(n)), el('span', {}, t));
-      cajaEstad.append(
+      cajaEstad.append(...[
         numero(estad.evento, 'sesiones en este evento'),
         numero(estad.impresionesEvento, 'impresiones en este evento'),
         numero(estad.total, 'sesiones en total'),
-        numero(estad.impresiones, 'impresiones en total'));
+        numero(estad.impresiones, 'impresiones en total'),
+        estad.contactos ? numero(estad.contactos, 'contactos en este evento') : null,
+      ].filter(Boolean));
+      // sesiones por hora: para ver los momentos de más movimiento
+      const horas = Object.entries(estad.porHora || {}).map(([h, n]) => [Number(h), n]).sort((a, b) => a[0] - b[0]);
+      if (!todos && horas.length) {
+        const max = Math.max(...horas.map(([, n]) => n));
+        cajaHoras.append(el('h3', {}, 'Sesiones por hora'),
+          el('div', { class: 'grafica-horas', role: 'img', 'aria-label': 'Sesiones por hora' },
+            ...horas.map(([h, n]) => el('div', { class: 'barra-hora', title: `${n} sesiones a las ${h}:00` },
+              el('span', { class: 'valor' }, String(n)),
+              el('span', { class: 'barra', style: `height:${Math.max(6, Math.round((n / max) * 100))}%` }),
+              el('span', { class: 'hora' }, `${h}h`)))));
+      }
 
       if (!sesiones.length) galeria.append(el('p', { class: 'nota' }, todos ? 'Todavía no hay sesiones.' : 'Todavía no hay sesiones en este evento.'));
       for (const s of sesiones) {

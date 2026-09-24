@@ -11,7 +11,7 @@ import {
   PLANTILLAS, plantillaPorId, buscarPlantilla, registrarPersonalizadas, componer, cargarImagen, fotoDeMuestra,
   dibujarMarcaDeAgua, dibujarCubriendo, dibujarStickers, tamanoDePlantilla, tamanoImpresion, todasLasPlantillas,
 } from './plantillas.js';
-import { crearGif } from './gif.js';
+import { crearGifEnSegundoPlano } from './gif.js';
 import { qrSvg, generarQR } from './qr.js';
 import { configurarSonidos, pitido, obturador, exito, hablar } from './sonidos.js';
 import { EditorStickers } from './stickers.js';
@@ -53,6 +53,9 @@ const estado = {
   urls: [],
   detenerVideo: null,
   papel: null, // hojas que quedan en la impresora (si se lleva la cuenta)
+  datosInvitado: null, // lo que escribió en el formulario (si está activo)
+  fondosVerde: [], // [{ url, imagen }] fondos de la pantalla verde ya cargados
+  posesUsadas: [],
 };
 
 const camara = new Camara();
@@ -140,13 +143,16 @@ async function aplicarConfig() {
   $('.evento-nombre').textContent = evento.nombre;
   $('.marca-eslogan').textContent = marca.eslogan;
 
-  const [logo, logoClaro, fondo] = await Promise.all([
+  const [logo, logoClaro, fondo, marco, fondosVerde] = await Promise.all([
     cargarImagen(marca.logo),
     cargarImagen(marca.logoClaro),
     cargarImagen(estado.config.plantillas.fondoImagen),
+    cargarImagen(marca.marcoAnimado),
+    Promise.all((estado.config.pantallaVerde.fondos || []).map(async (url) => ({ url, imagen: await cargarImagen(url) }))),
     cargarDisenos(),
   ]);
-  estado.recursos = { logo, logoClaro, fondo };
+  estado.recursos = { logo, logoClaro, fondo, marco };
+  estado.fondosVerde = fondosVerde.filter((f) => f.imagen);
 
   // en el inicio: la versión del logo que contrasta con el tema
   const oscuro = marca.tema === 'oscuro';
@@ -239,6 +245,7 @@ function vigilarCamaras() {
 // ================================================================ navegación
 
 function mostrarPantalla(nombre) {
+  if (nombre !== 'filtro' && nombre !== 'captura') detenerVistaCroma();
   document.querySelectorAll('.pantalla').forEach((p) => p.classList.toggle('activa', p.dataset.pantalla === nombre));
   estado.pantalla = nombre;
   estado.ultimaActividad = Date.now();
@@ -317,7 +324,7 @@ function atras() {
 function liberarSesion() {
   estado.urls.forEach((u) => URL.revokeObjectURL(u));
   Object.assign(estado, {
-    urls: [], fotos: [], vistas: [], compuesto: null, resultado: null, sesion: null, impreso: false,
+    urls: [], fotos: [], vistas: [], compuesto: null, resultado: null, sesion: null, impreso: false, datosInvitado: null,
   });
 }
 
@@ -326,6 +333,8 @@ function reiniciar() {
   estado.detenerVideo?.();
   if ('speechSynthesis' in window) speechSynthesis.cancel();
   liberarSesion();
+  camara.usarCroma(null);
+  mostrarPose('');
   estado.historial = [];
   $('#final-resultado').replaceChildren();
   $('#area-impresion').replaceChildren();
@@ -373,6 +382,49 @@ function comenzar() {
   if (estado.pantalla !== 'inicio' || ajustes.abierto) return;
   pitido(660, 0.08, 0.12);
   liberarSesion();
+  if (estado.config.formulario.activo && !MODO_WEB) return mostrarFormulario();
+  pasoModo();
+}
+
+// ================================================================ formulario de datos (opcional)
+
+function mostrarFormulario() {
+  const { formulario } = estado.config;
+  const form = $('#formulario-datos');
+  form.reset();
+  $('#dato-nombre').hidden = !formulario.pedirNombre;
+  $('#dato-correo').hidden = !formulario.pedirCorreo;
+  $('#dato-telefono').hidden = !formulario.pedirTelefono;
+  $('#btn-datos-omitir').hidden = Boolean(formulario.obligatorio);
+  $('#datos-error').hidden = true;
+  ir('datos');
+  setTimeout(() => form.querySelector('label:not([hidden]) input')?.focus(), 400);
+}
+
+function enviarFormulario() {
+  const { formulario } = estado.config;
+  const f = new FormData($('#formulario-datos'));
+  const datos = {
+    nombre: String(f.get('nombre') || '').trim(),
+    correo: String(f.get('correo') || '').trim(),
+    telefono: String(f.get('telefono') || '').trim(),
+    acepta: f.get('acepta') === 'on',
+  };
+  const falta = (formulario.pedirNombre && datos.nombre.length < 2)
+    || (formulario.pedirCorreo && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(datos.correo))
+    || (formulario.pedirTelefono && datos.telefono.replace(/\D/g, '').length < 7)
+    || !datos.acepta;
+  if (falta) {
+    const error = $('#datos-error');
+    error.textContent = t('datosFaltan');
+    error.hidden = false;
+    return;
+  }
+  estado.datosInvitado = datos;
+  pasoModo();
+}
+
+function pasoModo() {
   const modos = modosHabilitados();
   if (modos.length === 1) return elegirModo(modos[0]);
   const opciones = $('#opciones-modo');
@@ -393,7 +445,7 @@ function elegirModo(modo) {
     if (plantillas.length > 1) return mostrarPlantillas(plantillas);
     estado.plantilla = plantillas[0] || plantillaPorId(estado.config.plantillas.porDefecto);
   }
-  pasoFiltro();
+  pasoFondo();
 }
 
 // ================================================================ plantillas
@@ -420,11 +472,74 @@ function mostrarPlantillas(plantillas) {
     b.append(lienzo, nombre, detalle);
     b.addEventListener('click', () => {
       estado.plantilla = p;
-      pasoFiltro();
+      pasoFondo();
     });
     return b;
   }));
   ir('plantilla');
+}
+
+// ================================================================ pantalla verde
+
+function usarFondoVerde(fondo) {
+  const { color, tolerancia } = estado.config.pantallaVerde;
+  camara.usarCroma(fondo ? { fondo: fondo.imagen, color, tolerancia } : null);
+}
+
+/** Con pantalla verde y varios fondos, el invitado elige el suyo. */
+function pasoFondo() {
+  const fondos = estado.config.pantallaVerde.activo ? estado.fondosVerde : [];
+  if (fondos.length <= 1) {
+    usarFondoVerde(fondos[0] || null);
+    return pasoFiltro();
+  }
+  const contenedor = $('#opciones-fondo');
+  contenedor.replaceChildren(...fondos.map((f, i) => {
+    const b = document.createElement('button');
+    b.className = 'tarjeta-fondo';
+    b.style.animationDelay = `${i * 0.05}s`;
+    const img = document.createElement('img');
+    img.src = f.url;
+    img.alt = `Fondo ${i + 1}`;
+    b.append(img);
+    b.addEventListener('click', () => {
+      usarFondoVerde(f);
+      pasoFiltro();
+    });
+    return b;
+  }));
+  ir('fondo');
+}
+
+/** Vista previa con el fondo ya reemplazado: un lienzo encima del video en vivo. */
+const vistaCroma = { reloj: 0, lienzo: null };
+
+function mostrarVistaCroma(video) {
+  detenerVistaCroma();
+  if (!camara.croma) return;
+  let lienzo = video.nextElementSibling;
+  if (!lienzo?.classList.contains('vista-croma')) {
+    lienzo = document.createElement('canvas');
+    lienzo.className = 'vista-croma';
+    lienzo.setAttribute('aria-hidden', 'true');
+    video.after(lienzo);
+  }
+  const w = 640;
+  const h = Math.round((w * camara.alto) / camara.ancho / 2) * 2;
+  lienzo.width = w;
+  lienzo.height = h;
+  lienzo.hidden = false;
+  const ctx = lienzo.getContext('2d');
+  const pintar = () => camara.dibujar(ctx, w, h, { filtroCss: filtroCss(), espejo: estado.config.captura.espejoVistaPrevia });
+  pintar();
+  vistaCroma.reloj = setInterval(pintar, 1000 / 24);
+  vistaCroma.lienzo = lienzo;
+}
+
+function detenerVistaCroma() {
+  clearInterval(vistaCroma.reloj);
+  if (vistaCroma.lienzo) vistaCroma.lienzo.hidden = true;
+  vistaCroma.lienzo = null;
 }
 
 // ================================================================ filtros
@@ -438,6 +553,7 @@ function pasoFiltro() {
   const principal = $('#video-filtro');
   camara.conectar(principal);
   principal.style.filter = filtroCss();
+  mostrarVistaCroma(principal);
 
   const contenedor = $('#opciones-filtro');
   contenedor.replaceChildren(...filtros.map((f) => {
@@ -499,6 +615,23 @@ function pintarMiniaturas(total, actual) {
   }));
 }
 
+/** Una pose al azar (sin repetir hasta usarlas todas) para que cada foto sea distinta. */
+function sugerenciaDePose() {
+  const { sugerenciasPose, poses } = estado.config.captura;
+  if (!sugerenciasPose || !poses?.length) return '';
+  if (estado.posesUsadas.length >= poses.length) estado.posesUsadas = [];
+  const libres = poses.filter((p) => !estado.posesUsadas.includes(p));
+  const pose = libres[Math.floor(Math.random() * libres.length)];
+  estado.posesUsadas.push(pose);
+  return pose;
+}
+
+function mostrarPose(texto) {
+  const caja = $('#sugerencia-pose');
+  caja.textContent = texto;
+  caja.hidden = !texto;
+}
+
 async function cuentaRegresiva(segundos, token) {
   const caja = $('#cuenta');
   for (let s = segundos; s >= 1; s--) {
@@ -526,6 +659,7 @@ async function capturarFotos(indices, total, token) {
   const video = $('#video-principal');
   video.style.filter = filtroCss();
   camara.conectar(video);
+  mostrarVistaCroma(video);
 
   for (let k = 0; k < indices.length; k++) {
     const i = indices[k];
@@ -538,7 +672,9 @@ async function capturarFotos(indices, total, token) {
       await pausa(1400, token);
       mensaje('');
     }
+    mostrarPose(sugerenciaDePose());
     await cuentaRegresiva(k === 0 ? captura.cuentaPrimera : captura.cuentaRegresiva, token);
+    mostrarPose('');
     mensaje(t('capturaSonrian'));
     hablar(t('vozSonrian'));
     await pausa(350, token);
@@ -593,6 +729,7 @@ async function capturarBoomerang(token) {
   const video = $('#video-principal');
   video.style.filter = filtroCss();
   camara.conectar(video);
+  mostrarVistaCroma(video);
   pintarMiniaturas(0, -1);
   indicador(t('capturaBoomerang'));
   mensaje(t('capturaBoomerangAviso'));
@@ -620,7 +757,7 @@ async function capturarBoomerang(token) {
     const restante = Math.max(0, boomerang.segundos - (performance.now() - inicio) / 1000);
     $('#grabando-tiempo').textContent = `${restante.toFixed(1)} s`;
     camara.dibujar(ctx, w, h, { filtroCss: filtroCss(), espejo: captura.espejoFotos });
-    dibujarMarcaDeAgua(ctx, w, h, estado.config);
+    decorarCuadro(ctx, w, h);
     cuadros.push(ctx.getImageData(0, 0, w, h));
     const siguiente = inicio + (n + 1) * intervalo;
     await esperar(Math.max(0, siguiente - performance.now()));
@@ -632,7 +769,7 @@ async function capturarBoomerang(token) {
   ir('procesando');
   progreso(t('procesandoBoomerang'), 0);
   const secuencia = cuadros.concat(cuadros.slice(1, -1).reverse());
-  const gif = await crearGif(secuencia, {
+  const gif = await crearGifEnSegundoPlano(secuencia, {
     retrasoMs: intervalo,
     alProgreso: (f) => progreso(t('procesandoBoomerang'), f * 0.8),
   });
@@ -661,6 +798,7 @@ async function capturarVideo(token) {
   const vivo = $('#video-principal');
   vivo.style.filter = filtroCss();
   camara.conectar(vivo);
+  mostrarVistaCroma(vivo);
   pintarMiniaturas(0, -1);
   indicador(t('capturaVideo'));
   mensaje(t('capturaVideoAviso'));
@@ -677,7 +815,7 @@ async function capturarVideo(token) {
   const ctx = lienzo.getContext('2d');
   const pintar = () => {
     camara.dibujar(ctx, w, h, { filtroCss: filtroCss(), espejo: captura.espejoFotos });
-    dibujarMarcaDeAgua(ctx, w, h, estado.config);
+    decorarCuadro(ctx, w, h);
   };
   pintar();
   const dibujo = setInterval(pintar, 1000 / 30);
@@ -781,6 +919,13 @@ function progreso(texto, fraccion) {
   $('#procesando-barra').style.width = `${Math.round(Math.min(1, fraccion) * 100)}%`;
 }
 
+/** Marco de la marca (PNG con el centro transparente) y marca de agua sobre cada cuadro de GIF, boomerang o video. */
+function decorarCuadro(ctx, w, h) {
+  const marco = estado.recursos.marco;
+  if (marco) ctx.drawImage(marco, 0, 0, w, h);
+  dibujarMarcaDeAgua(ctx, w, h, estado.config);
+}
+
 async function gifDeFotos(fotos, alProgreso) {
   const w = Number(estado.config.gif.ancho) || 720;
   const h = Math.round((w * fotos[0].height) / fotos[0].width / 2) * 2;
@@ -790,10 +935,10 @@ async function gifDeFotos(fotos, alProgreso) {
   const ctx = lienzo.getContext('2d', { willReadFrequently: true });
   const cuadros = fotos.map((f) => {
     dibujarCubriendo(ctx, f, 0, 0, w, h, 0.5);
-    dibujarMarcaDeAgua(ctx, w, h, estado.config);
+    decorarCuadro(ctx, w, h);
     return ctx.getImageData(0, 0, w, h);
   });
-  return crearGif(cuadros, { retrasoMs: estado.config.gif.retrasoMs, alProgreso });
+  return crearGifEnSegundoPlano(cuadros, { retrasoMs: estado.config.gif.retrasoMs, alProgreso });
 }
 
 async function fotosIndividuales() {
@@ -817,7 +962,7 @@ function miniaturaDe(fuente) {
 function crearSesion(principal) {
   return api('/api/sesiones', {
     method: 'POST',
-    json: { modo: estado.modo, plantilla: estado.plantilla?.id, filtro: estado.filtro, principal },
+    json: { modo: estado.modo, plantilla: estado.plantilla?.id, filtro: estado.filtro, principal, datos: estado.datosInvitado },
   });
 }
 
@@ -1045,6 +1190,13 @@ function mostrarFinal() {
   exito();
   ir('final');
   estado.historial = [];
+  // impresión automática: sale sola, sin que el invitado toque "Imprimir"
+  if (puedeImprimir && config.impresion.automatica) {
+    const token = estado.token;
+    setTimeout(() => {
+      if (token === estado.token && estado.pantalla === 'final' && !estado.impreso) imprimirSesion();
+    }, 1200);
+  }
 }
 
 /** Hojas que quedan en la impresora (Infinity si no se lleva la cuenta). */
@@ -1273,12 +1425,37 @@ function vigilarInactividad() {
       if (restante <= 0) reiniciar();
       return;
     }
-    const conInteraccion = ['modo', 'plantilla', 'filtro', 'revision', 'stickers'];
+    const conInteraccion = ['datos', 'modo', 'plantilla', 'fondo', 'filtro', 'revision', 'stickers'];
     if (conInteraccion.includes(estado.pantalla)
       && ahora - estado.ultimaActividad > estado.config.general.inactividadSegundos * 1000) {
       reiniciar();
     }
   }, 1000);
+}
+
+// ================================================================ conexión con el servidor
+
+/**
+ * Si el servidor deja de responder (la aplicación lo vuelve a abrir sola),
+ * se avisa discretamente y se quita el aviso en cuanto vuelve.
+ */
+function vigilarServidor() {
+  if (MODO_WEB) return;
+  let fallos = 0;
+  setInterval(async () => {
+    let ok = false;
+    try {
+      ok = (await fetch('/api/red', { cache: 'no-store', signal: AbortSignal.timeout(4000) })).ok;
+    } catch { /* sin respuesta */ }
+    const caja = $('#aviso-servidor');
+    if (ok) {
+      if (fallos >= 2) aviso('✅ Conexión con la cabina recuperada');
+      fallos = 0;
+      caja.hidden = true;
+    } else if (++fallos >= 2) {
+      caja.hidden = false;
+    }
+  }, 5000);
 }
 
 // ================================================================ arranque
@@ -1300,6 +1477,15 @@ function conectarEventos() {
   }));
 
   $('#btn-filtro-listo').addEventListener('click', iniciarCaptura);
+  $('#btn-datos-continuar').addEventListener('click', enviarFormulario);
+  $('#btn-datos-omitir').addEventListener('click', () => {
+    estado.datosInvitado = null;
+    pasoModo();
+  });
+  $('#formulario-datos').addEventListener('submit', (e) => {
+    e.preventDefault();
+    enviarFormulario();
+  });
   $('#btn-repetir-todo').addEventListener('click', () => repetir([...estado.fotos.keys()]));
   $('#btn-revision-listo').addEventListener('click', () => continuarTrasFotos());
   $('#btn-stickers-listo').addEventListener('click', () => finalizarFoto(editor.resultado(), estado.token));
@@ -1390,6 +1576,7 @@ async function arrancar() {
 
   conectarEventos();
   vigilarInactividad();
+  vigilarServidor();
   vigilarCamaras();
   mostrarPantalla('inicio');
   cargarRecientes();
