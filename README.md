@@ -14,7 +14,9 @@ Funciona de dos maneras con el mismo código:
 | Código QR con datos móviles o cualquier Wi-Fi (automático) | ✅ | ❌ |
 | Código QR subiendo las fotos a la nube (opcional) | ✅ | ✅ |
 
-👉 **Probar la cabina en el navegador:** <https://wanna033.github.io/sonria-pues-photobooth/public/>
+👉 **La cabina en tu celular:** <https://wanna033.github.io/sonria-pues-photobooth/public/>
+— elige tu diseño, tómate las fotos con la cámara del teléfono y guárdalas en tu galería.
+Los diseños que aparecen ahí se publican desde la PC en *Ajustes → Celulares*.
 
 ---
 

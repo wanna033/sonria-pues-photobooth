@@ -90,13 +90,19 @@ export class Camara {
     return this.demo ? 'Cámara de demostración' : (this.stream?.getVideoTracks()[0]?.label || 'Cámara');
   }
 
-  async iniciar({ camaraId = '', resolucion = '1920x1080' } = {}) {
+  /**
+   * @param {{camaraId?: string, resolucion?: string, lado?: ''|'user'|'environment'}} opciones
+   *   lado: en el celular, cámara frontal ('user') o trasera ('environment').
+   */
+  async iniciar({ camaraId = '', resolucion = '1920x1080', lado = '' } = {}) {
     this.detener();
+    this.lado = lado;
     const [ancho, alto] = String(resolucion).split('x').map(Number);
     const pedir = (id) => navigator.mediaDevices.getUserMedia({
       audio: false,
       video: {
         ...(id ? { deviceId: { exact: id } } : {}),
+        ...(!id && lado ? { facingMode: { ideal: lado } } : {}),
         width: { ideal: ancho || 1920 },
         height: { ideal: alto || 1080 },
         frameRate: { ideal: 30 },
@@ -120,7 +126,7 @@ export class Camara {
 
     // Automática: con el permiso ya dado se conocen los nombres; si hay una cámara
     // conectada mejor que la actual (p. ej. USB en vez de la integrada), se cambia a ella.
-    if (this.stream && !camaraId) {
+    if (this.stream && !camaraId && !lado) {
       const actual = this.stream.getVideoTracks()[0];
       const mejor = (await this.listar())
         .map((c, i) => ({ ...c, orden: i, prioridad: Camara.prioridad(c.nombre) }))

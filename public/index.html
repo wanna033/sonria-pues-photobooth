@@ -2,9 +2,16 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Sonría Pues</title>
   <link rel="icon" href="marca/icono.png" type="image/png">
+  <!-- en el celular se puede "Agregar a la pantalla de inicio" como una app -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="marca/icono.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Sonría Pues">
+  <meta name="theme-color" content="#184659">
   <link rel="stylesheet" href="css/app.css">
   <style id="estilo-pagina-impresion"></style>
   <!-- el tema se fija antes de pintar para que no parpadee (se confirma con los ajustes) -->
@@ -105,6 +112,9 @@
     <div class="filtro-cuerpo">
       <div class="filtro-principal">
         <video class="video-vivo espejo" id="video-filtro" muted playsinline autoplay></video>
+        <button class="boton-voltear" id="btn-voltear" type="button" aria-label="Cambiar de cámara" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3 7.2 5H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.2L15 3H9zm3 4.5a5 5 0 0 1 4.6 3H18l-2.5 3-2.5-3h1.4a3 3 0 0 0-5.3-.6L7.8 8.8A5 5 0 0 1 12 7.5zm-3.5 3.5 2.5 3H9.6a3 3 0 0 0 5.3.6l1.3 1.1A5 5 0 0 1 7.4 14H6l2.5-3z"/></svg>
+        </button>
       </div>
       <div class="opciones-filtro" id="opciones-filtro"></div>
     </div>
@@ -198,7 +208,8 @@
           </button>
           <p class="tamano-impresion" id="tamano-impresion"></p>
         </div>
-        <a class="boton-gigante" id="btn-descargar" data-texto="finalDescargar" download hidden>Descargar mi recuerdo</a>
+        <a class="boton-gigante" id="btn-descargar" data-texto="finalDescargar" download hidden>Guardar en mi celular</a>
+        <button class="boton-secundario grande" id="btn-compartir" data-texto="finalCompartir" hidden>Compartir</button>
         <div class="bloque-qr" id="bloque-qr">
           <div class="qr" id="qr"></div>
           <p><span data-texto="finalQr">Escanea con tu celular para descargar</span><br><small data-texto="finalQrAyuda">(conéctate al Wi-Fi del evento)</small></p>

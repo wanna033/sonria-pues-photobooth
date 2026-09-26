@@ -185,5 +185,11 @@
     "pantallaFinalSegundos": 60,
     "mostrarRecientes": true,
     "carpetaRespaldo": ""
+  },
+  "web": {
+    "url": "https://wanna033.github.io/sonria-pues-photobooth/public/",
+    "disenos": [],
+    "plantillasBasicas": true,
+    "ultimaPublicacion": ""
   }
 }

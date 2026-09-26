@@ -210,16 +210,27 @@ En *Ajustes → Galería* aparece el QR y el enlace con **todas** las fotos del 
 compartirlo con el cliente. También puedes mostrarlo en una esquina del inicio
 (**"QR de la galería del evento en el inicio"**).
 
-## La versión web (misma cabina en el navegador)
+## La cabina en el celular de cada invitado
 
-El mismo código funciona publicado como página web, por ejemplo en GitHub Pages. Ahí:
+La misma cabina funciona como página de internet en cualquier celular (Android o iPhone),
+sin instalar nada: <https://wanna033.github.io/sonria-pues-photobooth/public/>
 
-- Sí funcionan: la cámara, los modos, filtros, stickers, plantillas, tus diseños y la
-  descarga del recuerdo; y el código QR si configuraste la nube.
-- No funcionan: la impresión desde la cabina, la galería y las fotos guardadas en disco.
-  Los ajustes y los diseños se guardan **en ese mismo dispositivo**, no en la computadora.
+El invitado elige el modo y el diseño, se toma las fotos con **su propia cámara** (con un botón
+cambia entre la de selfie y la de atrás), las decora con stickers y toca **Guardar en mi
+celular**. En iPhone se abre el menú para compartir: ahí elige *Guardar imagen* y queda en Fotos.
+El botón **Compartir** la manda directo a WhatsApp, Instagram, etc. La página nunca vuelve sola
+al inicio, así que nadie pierde su foto. También se puede "Agregar a la pantalla de inicio"
+para usarla como una app.
 
-La cabina detecta sola si hay servidor detrás; no hay que configurar nada.
+**Qué diseños ven:** en la computadora abre *Ajustes → Celulares*, marca tus diseños (y si
+quieres, las plantillas básicas) y pulsa **🌐 Publicar en internet**. En 1 o 2 minutos aparecen
+en todos los celulares. También se publican el nombre del evento, el logotipo, los colores, los
+textos, los filtros y los stickers; **nunca** el PIN, la impresora, la nube ni las fotos. Ahí
+mismo está el QR del enlace para ponerlo en las mesas o mandarlo por WhatsApp.
+
+En el celular no hay impresión ni galería del evento: cada invitado guarda sus fotos en su
+teléfono. Los ajustes no se ven en el celular; para abrirlos agrega `?ajustes` al final del
+enlace. La cabina detecta sola si hay servidor detrás; no hay que configurar nada.
 
 ## Si algo falla durante el evento
 

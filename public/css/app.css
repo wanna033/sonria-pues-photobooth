@@ -438,6 +438,7 @@ h1, h2, h3 { margin: 0; }
   margin: 0 auto;
   gap: clamp(14px, 2.5vmin, 30px);
   align-content: center;
+  align-content: safe center; /* si no caben, se ven desde arriba en vez de cortarse */
   overflow-y: auto;
   padding: 8px;
 }
@@ -1038,6 +1039,28 @@ h1, h2, h3 { margin: 0; }
 }
 
 .fila-botones { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+/* pestaña "Celulares" */
+.celular-enlace { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; margin-bottom: 8px; }
+.celular-enlace > div:last-child { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 240px; }
+.celular-enlace a { color: var(--primario); word-break: break-all; user-select: text; -webkit-user-select: text; }
+.celular-qr { width: 160px; flex-shrink: 0; padding: 8px; border-radius: 12px; background: #fff; }
+.celular-qr svg { display: block; width: 100%; height: auto; }
+.celular-disenos { display: grid; gap: 10px; }
+.celular-diseno {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  cursor: pointer;
+}
+.celular-diseno input { width: 22px; height: 22px; flex-shrink: 0; }
+.celular-diseno img { width: 48px; height: 72px; object-fit: contain; border-radius: 6px; background: #000; }
+.celular-diseno span { display: flex; flex-direction: column; gap: 2px; }
+.celular-diseno small { color: var(--texto-suave); }
 .recurso-vista { max-height: 64px; max-width: 200px; border-radius: 8px; background: repeating-conic-gradient(#555 0 25%, #333 0 50%) 0 0 / 16px 16px; }
 
 .estadisticas { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
@@ -1153,6 +1176,72 @@ h1, h2, h3 { margin: 0; }
   .filtro-cuerpo, .stickers-cuerpo, .final-cuerpo { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1.3fr) minmax(0, 1fr); }
   .opciones-filtro { grid-template-columns: repeat(3, 1fr); }
   .tarjeta-modo { aspect-ratio: auto; min-height: 22vh; }
+}
+
+/* ---------------------------------------------------------------- celulares (versión web) */
+
+/* cambiar entre la cámara frontal y la trasera */
+.boton-voltear {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #fff;
+  backdrop-filter: blur(6px);
+}
+.boton-voltear svg { width: 30px; height: 30px; fill: currentColor; }
+.boton-voltear[hidden] { display: none; }
+.boton-voltear:disabled { opacity: 0.5; }
+
+/* los invitados no ven los ajustes en su celular (se abren agregando ?ajustes a la dirección) */
+body.modo-web:not(.admin) #btn-ajustes { display: none; }
+
+@media (max-width: 600px) {
+  .pantalla {
+    padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+  }
+  .encabezado { min-height: 48px; padding: 0 52px; }
+  .encabezado h2 { font-size: 24px; }
+  .boton-volver { width: 44px; height: 44px; font-size: 32px; padding-bottom: 4px; }
+  .aviso-camara {
+    width: calc(100% - 32px);
+    white-space: normal;
+    text-align: center;
+    border-radius: 16px;
+    font-size: 14px;
+  }
+
+  /* modos en fila (ícono a la izquierda) para que quepan los cuatro */
+  .opciones-modo { align-content: safe center; overflow-y: auto; gap: 12px; padding: 4px; }
+  .tarjeta-modo {
+    display: grid;
+    grid-template-columns: 64px 1fr;
+    grid-template-rows: auto auto;
+    column-gap: 16px;
+    row-gap: 2px;
+    justify-items: start;
+    aspect-ratio: auto;
+    min-height: 0;
+    padding: 16px 18px;
+    text-align: left;
+  }
+  .tarjeta-modo .icono { grid-row: span 2; width: 64px; height: 64px; font-size: 32px; }
+  .tarjeta-modo strong { align-self: end; font-size: 24px; }
+  .tarjeta-modo span:not(.icono) { align-self: start; text-align: left; font-size: 15px; }
+
+  /* la lista de diseños empieza arriba (centrada se cortaba la primera fila) */
+  .opciones-plantilla { align-content: start; gap: 12px; padding: 4px; }
+  .tarjeta-plantilla { padding: 12px 10px; gap: 8px; }
+  .tarjeta-plantilla canvas { height: 150px; }
+  .tarjeta-plantilla strong { font-size: 16px; text-align: center; overflow-wrap: anywhere; }
+  .tarjeta-plantilla span { font-size: 13px; text-align: center; }
 }
 
 /* ---------------------------------------------------------------- impresión */

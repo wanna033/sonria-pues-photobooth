@@ -1,0 +1,16 @@
+{
+  "name": "Sonría Pues Photobooth",
+  "short_name": "Sonría Pues",
+  "description": "Cabina de fotos en tu celular: elige tu diseño, tómate las fotos y guárdalas.",
+  "lang": "es",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fffdf8",
+  "theme_color": "#184659",
+  "icons": [
+    { "src": "marca/icono.png", "sizes": "256x256", "type": "image/png", "purpose": "any" },
+    { "src": "icono.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

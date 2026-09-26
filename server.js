@@ -67,6 +67,7 @@ const MIME = {
   '.mp4': 'video/mp4',
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
+  '.webmanifest': 'application/manifest+json',
 };
 
 for (const dir of [DATOS, FOTOS, PAPELERA, RECURSOS, DISENOS]) fs.mkdirSync(dir, { recursive: true });
@@ -447,6 +448,123 @@ async function borrarImagenesDeDiseno(id) {
   for (const ext of EXTENSIONES_IMAGEN) {
     await fsp.unlink(path.join(DISENOS, `${id}.${ext}`)).catch(() => {});
   }
+}
+
+// ---------------------------------------------------------------- versión para celulares
+//
+// La cabina también funciona en el celular de cada invitado (public/ publicada en
+// GitHub Pages). Para que ahí salgan los diseños propios y la marca, se copian a
+// la carpeta web/ del repositorio y se suben a GitHub con git:
+//   web/config.json   ajustes sin nada privado (PIN, nube, impresora, respaldo)
+//   web/disenos.json  diseños elegidos, con su imagen en web/disenos/
+//   web/recursos/     logotipos y fondos que usan esos ajustes
+
+const WEB = path.join(RAIZ, 'web');
+
+/** Ejecuta un programa sin congelar el servidor. */
+function ejecutar(programa, args, segundos = 120) {
+  return new Promise((resolve) => {
+    let salida = '';
+    let hijo;
+    try {
+      hijo = spawn(programa, args, {
+        cwd: RAIZ,
+        windowsHide: true,
+        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+      });
+    } catch (err) {
+      return resolve({ codigo: -1, salida: err.message });
+    }
+    const limite = setTimeout(() => hijo.kill(), segundos * 1000);
+    hijo.stdout.on('data', (d) => { salida += d; });
+    hijo.stderr.on('data', (d) => { salida += d; });
+    hijo.on('error', (err) => { salida += err.message; });
+    hijo.on('close', (codigo) => {
+      clearTimeout(limite);
+      resolve({ codigo, salida: salida.trim() });
+    });
+  });
+}
+
+/** Ajustes para la versión del celular: sin datos privados ni cosas que sólo sirven en la cabina. */
+function configParaCelular(config, { disenos, plantillasBasicas }) {
+  const c = structuredClone(config);
+  c.general = { ...c.general, pin: CONFIG_BASE.general.pin, carpetaRespaldo: '' };
+  c.compartir = structuredClone(CONFIG_BASE.compartir);
+  c.compartir.qr = false;
+  c.captura.camaraId = '';
+  c.formulario.activo = false;
+  c.pantallaVerde = { ...c.pantallaVerde, activo: false, fondos: [] }; // en casa no hay tela verde
+  c.impresion.habilitada = false;
+  const basicas = plantillasBasicas ? CONFIG_BASE.plantillas.habilitadas : [];
+  c.plantillas.habilitadas = [...disenos, ...basicas];
+  if (!c.plantillas.habilitadas.length) c.plantillas.habilitadas = [CONFIG_BASE.plantillas.porDefecto];
+  c.plantillas.porDefecto = c.plantillas.habilitadas[0];
+  delete c.web;
+  return c;
+}
+
+/** Copia a web/recursos/ las imágenes subidas en los ajustes y cambia sus enlaces. */
+async function copiarRecursosWeb(valor) {
+  if (typeof valor === 'string') {
+    const m = /^\/recursos\/([^?#]+)/.exec(valor);
+    if (!m || !RECURSO_VALIDO.test(m[1])) return valor;
+    const origen = path.join(RECURSOS, m[1]);
+    if (!fs.existsSync(origen)) return '';
+    await fsp.copyFile(origen, path.join(WEB, 'recursos', m[1]));
+    return `../web/recursos/${m[1]}?v=${Math.round(fs.statSync(origen).mtimeMs)}`;
+  }
+  if (Array.isArray(valor)) return Promise.all(valor.map(copiarRecursosWeb));
+  if (esObjeto(valor)) {
+    const salida = {};
+    for (const [clave, v] of Object.entries(valor)) salida[clave] = await copiarRecursosWeb(v);
+    return salida;
+  }
+  return valor;
+}
+
+async function publicarWeb({ disenos, plantillasBasicas }) {
+  const existentes = new Map(listarDisenos().map((d) => [d.id, d]));
+  const ids = [...new Set(disenos)].filter((id) => ID_DISENO.test(id) && existentes.has(id));
+
+  // se arma de cero para que no queden diseños que ya no se publican
+  await fsp.rm(WEB, { recursive: true, force: true });
+  await fsp.mkdir(path.join(WEB, 'disenos'), { recursive: true });
+  await fsp.mkdir(path.join(WEB, 'recursos'), { recursive: true });
+
+  const lista = [];
+  for (const id of ids) {
+    const imagen = imagenDeDiseno(id);
+    await fsp.copyFile(path.join(DISENOS, imagen), path.join(WEB, 'disenos', imagen));
+    const { url, ...meta } = existentes.get(id);
+    const version = Math.round(fs.statSync(path.join(DISENOS, imagen)).mtimeMs);
+    lista.push({ ...meta, url: `../web/disenos/${imagen}?v=${version}` });
+  }
+  const config = await copiarRecursosWeb(configParaCelular(leerConfig(), { disenos: ids, plantillasBasicas }));
+  await escribirAtomico(path.join(WEB, 'disenos.json'), JSON.stringify(lista, null, 2));
+  await escribirAtomico(path.join(WEB, 'config.json'), JSON.stringify(config, null, 2));
+
+  // subir a GitHub (la página se actualiza sola en 1 o 2 minutos)
+  const git = (...args) => ejecutar('git', args);
+  const version = await git('--version');
+  if (version.codigo !== 0) throw new Error('No se encontró git en esta computadora: instala Git para Windows para publicar');
+  if ((await git('rev-parse', '--is-inside-work-tree')).codigo !== 0) {
+    throw new Error('Esta carpeta de la cabina no está conectada a GitHub, así que no se puede publicar desde aquí');
+  }
+  await git('add', '-A', '--', 'web');
+  const cambios = await git('diff', '--cached', '--quiet', '--', 'web');
+  if (cambios.codigo !== 0) {
+    const commit = await git('commit', '-m', `Versión para celular: ${ids.length} ${ids.length === 1 ? 'diseño' : 'diseños'} publicados`, '--', 'web');
+    if (commit.codigo !== 0) throw new Error(`No se pudo guardar el cambio: ${commit.salida.split('\n').pop()}`);
+  }
+  const envio = await git('push');
+  if (envio.codigo !== 0) {
+    throw new Error(`No se pudo subir a GitHub (revisa el internet o la cuenta): ${envio.salida.split('\n').pop()}`);
+  }
+  const guardada = leerConfig();
+  guardarConfig({ ...guardada, web: { ...guardada.web, disenos: ids, plantillasBasicas, ultimaPublicacion: new Date().toISOString() } });
+  log(`Versión para celular publicada con ${ids.length} diseños`);
+  return { ok: true, disenos: ids, url: guardada.web.url, sinCambios: cambios.codigo === 0 };
 }
 
 // ---------------------------------------------------------------- fotos guardadas en internet (Cloudinary)
@@ -1463,6 +1581,18 @@ async function manejarApi(req, res, metodo, partes, url) {
       }
       log(`Diseño ${id} enviado a la papelera`);
       return enviarJSON(res, 200, { ok: true });
+    }
+  }
+
+  // ---- versión para celulares: publica los diseños elegidos en la página de internet
+  if (recurso === 'web' && id === 'publicar' && metodo === 'POST') {
+    const { disenos = [], plantillasBasicas = true } = await leerJSON(req);
+    try {
+      const resultado = await publicarWeb({ disenos, plantillasBasicas: Boolean(plantillasBasicas) });
+      return enviarJSON(res, 200, resultado);
+    } catch (err) {
+      log(`No se pudo publicar la versión para celular: ${err.message}`);
+      return enviarError(res, 500, err.message);
     }
   }
 

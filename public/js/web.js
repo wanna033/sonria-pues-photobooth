@@ -68,14 +68,35 @@ export async function detectarModoWeb() {
   }
 }
 
-/** Configuración de fábrica (config.default.json, que vive junto al programa). */
+const leerRemoto = async (ruta, porDefecto) => {
+  try {
+    const res = await fetch(ruta, { cache: 'no-cache' });
+    return res.ok ? await res.json() : porDefecto;
+  } catch {
+    return porDefecto;
+  }
+};
+
+let publicados = null;
+
+/**
+ * Lo que se publicó desde la cabina de la computadora (Ajustes → Celulares):
+ * los ajustes con la marca del evento y los diseños propios, en la carpeta web/.
+ */
+function publicado() {
+  publicados ??= Promise.all([leerRemoto('../web/config.json', null), leerRemoto('../web/disenos.json', [])])
+    .then(([config, disenos]) => ({ config, disenos: Array.isArray(disenos) ? disenos : [] }));
+  return publicados;
+}
+
+/** Configuración de fábrica (config.default.json) con lo publicado desde la cabina encima. */
 async function configDeFabrica() {
   if (configBase) return configBase;
-  try {
-    configBase = await (await fetch('../config.default.json')).json();
-  } catch {
-    configBase = {};
-  }
+  const fabrica = await leerRemoto('../config.default.json', {});
+  const { config } = await publicado();
+  configBase = config ? mezclar(fabrica, config) : fabrica;
+  // en el celular no se imprime: la descripción de fábrica de "Fotos" hablaba de la impresión
+  configBase.textos = { modoFotoDetalle: 'Tus fotos en el diseño que elijas', ...config?.textos };
   return configBase;
 }
 
@@ -92,11 +113,11 @@ export async function apiWeb(ruta, { method = 'GET', json, body } = {}) {
     const fabrica = await configDeFabrica();
     if (method === 'PUT') {
       guardarJson(CLAVE_CONFIG, json);
-      return mezclar(fabrica, json);
+      return { ...mezclar(fabrica, json), textos: { ...fabrica.textos, ...json?.textos } };
     }
     const guardada = leerJson(CLAVE_CONFIG, {});
     const config = mezclar(fabrica, guardada);
-    config.textos = guardada.textos || {};
+    config.textos = { ...fabrica.textos, ...guardada.textos };
     return config;
   }
 
@@ -106,7 +127,11 @@ export async function apiWeb(ruta, { method = 'GET', json, body } = {}) {
 
   if (recurso === 'disenos') {
     const disenos = leerJson(CLAVE_DISENOS, []);
-    if (method === 'GET' && !id) return disenos;
+    if (method === 'GET' && !id) {
+      // los publicados desde la cabina más los que se hayan creado en este dispositivo
+      const propios = new Set(disenos.map((d) => d.id));
+      return [...disenos, ...(await publicado()).disenos.filter((d) => !propios.has(d.id))];
+    }
     if (method === 'PUT' && extra === 'imagen') {
       const diseno = disenos.find((d) => d.id === id);
       if (diseno) diseno.url = await aDataUrl(body);

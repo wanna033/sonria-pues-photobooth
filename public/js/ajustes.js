@@ -34,6 +34,7 @@ const SECCIONES = [
     ],
   },
   { id: 'disenos', titulo: 'Mis diseños', especial: 'disenos' },
+  { id: 'celular', titulo: 'Celulares', especial: 'celular' },
   {
     id: 'camara',
     titulo: 'Cámara',
@@ -254,6 +255,7 @@ export class Ajustes {
     if (seccion.especial === 'estado') return this.mostrarEstado();
     if (seccion.especial === 'textos') return this.mostrarTextos();
     if (seccion.especial === 'disenos') return this.mostrarDisenos();
+    if (seccion.especial === 'celular') return this.mostrarCelular();
     if (seccion.especial === 'galeria') return this.mostrarGaleria();
     if (seccion.especial === 'ayuda') return this.mostrarAyuda();
     for (const campo of seccion.campos) this.contenido.append(this.crearCampo(campo));
@@ -605,6 +607,114 @@ export class Ajustes {
       alCambiar: (cambio) => this.alCambiarDisenos(cambio),
     });
     this.editorDisenos.mostrarLista();
+  }
+
+  /**
+   * Pestaña "Celulares": la cabina en el celular de cada invitado (página de
+   * internet). Aquí se eligen los diseños que verán y se publican con un botón.
+   */
+  async mostrarCelular() {
+    const c = this.contenido;
+    const { url } = this.borrador.web;
+    c.append(
+      el('h3', {}, 'La cabina en el celular de tus invitados'),
+      el('p', { class: 'nota' }, 'Cualquier persona abre este enlace en su celular (Android o iPhone), elige un diseño, se toma las fotos con su propia cámara y las guarda en su galería. No tiene que instalar nada.'),
+    );
+    if (this.modoWeb) {
+      c.append(el('p', { class: 'nota' }, 'Los diseños para los celulares se publican desde la cabina de la computadora.'));
+      return;
+    }
+
+    const qr = el('div', { class: 'celular-qr' });
+    qr.innerHTML = qrSvg(url, { nivel: 'M', margen: 2 });
+    const boton = (texto, accion) => el('button', { class: 'boton-secundario', type: 'button', onclick: accion }, texto);
+    c.append(el('div', { class: 'celular-enlace' },
+      qr,
+      el('div', {},
+        el('strong', {}, 'Enlace para los invitados'),
+        el('a', { href: url, target: '_blank', rel: 'noopener' }, url),
+        el('p', { class: 'nota' }, 'Ponlo en las mesas, en la invitación o mándalo por WhatsApp.'),
+        el('div', { class: 'fila-botones' },
+          boton('📋 Copiar enlace', async () => {
+            try {
+              await navigator.clipboard.writeText(url);
+              this.acciones.aviso?.('📋 Enlace copiado');
+            } catch {
+              this.acciones.aviso?.('No se pudo copiar: selecciona el enlace y cópialo');
+            }
+          }),
+          boton('⬇️ Descargar QR', () => this.descargarQr(qr.querySelector('svg')))))));
+
+    const disenos = await this.api('/api/disenos').catch(() => []);
+    const elegidos = new Set(this.borrador.web.disenos);
+    c.append(el('h3', {}, 'Diseños que verán en el celular'));
+    if (!disenos.length) c.append(el('p', { class: 'nota' }, 'Todavía no tienes diseños propios: súbelos en "Mis diseños".'));
+    const lista = el('div', { class: 'celular-disenos' });
+    for (const d of disenos) {
+      const check = el('input', { type: 'checkbox', checked: elegidos.has(d.id) });
+      check.addEventListener('change', () => (check.checked ? elegidos.add(d.id) : elegidos.delete(d.id)));
+      lista.append(el('label', { class: 'celular-diseno' },
+        check,
+        el('img', { src: d.url, alt: '', loading: 'lazy' }),
+        el('span', {}, el('strong', {}, d.nombre), el('small', {}, `${d.ranuras.length} ${d.ranuras.length === 1 ? 'foto' : 'fotos'}`))));
+    }
+    const basicas = el('input', { type: 'checkbox', checked: this.borrador.web.plantillasBasicas });
+    lista.append(el('label', { class: 'celular-diseno' },
+      basicas,
+      el('span', {}, el('strong', {}, 'Plantillas básicas'), el('small', {}, 'Tira clásica, postal, cuadrícula y las demás'))));
+    c.append(lista);
+
+    c.append(el('p', { class: 'nota' }, 'También se publican el nombre del evento, tu logotipo, los colores, los textos, los filtros y los stickers. El PIN, la impresora, la nube y las fotos de los invitados nunca se publican.'));
+    const estado = el('p', { class: 'nota' }, this.borrador.web.ultimaPublicacion
+      ? `Última publicación: ${new Date(this.borrador.web.ultimaPublicacion).toLocaleString('es')}`
+      : 'Todavía no has publicado nada.');
+    const publicar = el('button', { class: 'boton-primario', type: 'button' }, '🌐 Publicar en internet');
+    publicar.addEventListener('click', async () => {
+      if (!elegidos.size && !basicas.checked) {
+        this.acciones.aviso?.('Elige al menos un diseño o las plantillas básicas');
+        return;
+      }
+      publicar.disabled = true;
+      estado.textContent = '⏳ Publicando… puede tardar un minuto.';
+      try {
+        // se publica lo que se ve en los ajustes, aunque todavía no se haya tocado "Guardar"
+        const guardada = await this.api('/api/config', { method: 'PUT', json: this.borrador });
+        await this.acciones.alActualizar?.(guardada);
+        const r = await this.api('/api/web/publicar', {
+          method: 'POST',
+          json: { disenos: [...elegidos], plantillasBasicas: basicas.checked },
+        });
+        this.borrador = structuredClone(await this.api('/api/config'));
+        estado.textContent = r.sinCambios
+          ? '✅ Ya estaba publicado así: no había nada nuevo que subir.'
+          : '✅ Publicado. En 1 o 2 minutos aparece en los celulares (si ya la tenían abierta, que recarguen la página).';
+      } catch (err) {
+        estado.textContent = `❌ ${err.message}`;
+      }
+      publicar.disabled = false;
+    });
+    c.append(el('div', { class: 'fila-botones' }, publicar), estado);
+  }
+
+  /** Guarda el QR del enlace como imagen PNG (para imprimirlo o mandarlo por WhatsApp). */
+  async descargarQr(svg) {
+    const lado = 1200;
+    const codigo = svg.outerHTML.replace('<svg ', `<svg width="${lado}" height="${lado}" `);
+    const imagen = await cargarImagen(URL.createObjectURL(new Blob([codigo], { type: 'image/svg+xml' })));
+    if (!imagen) return this.acciones.aviso?.('No se pudo crear la imagen del QR');
+    const lienzo = document.createElement('canvas');
+    lienzo.width = lado;
+    lienzo.height = lado;
+    const ctx = lienzo.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, lado, lado);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(imagen, 0, 0, lado, lado);
+    lienzo.toBlob((blob) => {
+      const a = el('a', { href: URL.createObjectURL(blob), download: 'qr-cabina-celular.png' });
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    }, 'image/png');
   }
 
   /** Al guardar o quitar un diseño se actualizan las plantillas del evento y se guardan los ajustes. */

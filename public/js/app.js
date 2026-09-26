@@ -122,10 +122,32 @@ const modosHabilitados = () => Object.keys(MODOS).filter((m) => estado.config.mo
 const plantillasHabilitadas = () => {
   const lista = estado.config.plantillas.habilitadas.map(buscarPlantilla)
     .filter((p, i, a) => p && a.indexOf(p) === i);
-  return lista.length ? lista : [plantillaPorId(estado.config.plantillas.porDefecto)];
+  return (lista.length ? lista : [plantillaPorId(estado.config.plantillas.porDefecto)]).map(paraCelular);
 };
+
+/**
+ * En el celular no se imprime: las tiras que en la cabina salen dos por hoja
+ * (para cortarlas) se guardan como una sola tira.
+ */
+function paraCelular(p) {
+  if (!MODO_WEB) return p;
+  const fotos = `${p.fotos} ${p.fotos === 1 ? 'foto' : 'fotos'}`;
+  if (!p.duplicar) return { ...p, descripcion: p.descripcion.replace(/\s*·\s*[\d.,]+\s*×\s*[\d.,]+\s*cm/, '') };
+  return {
+    ...p,
+    duplicar: false,
+    ancho: p.personalizada ? p.ancho : p.ancho / 2,
+    descripcion: `${fotos} · tira`,
+  };
+}
+
 const filtrosHabilitados = () => FILTROS.filter((f) => estado.config.filtros.habilitados.includes(f.id));
 const filtroCss = () => filtroPorId(estado.filtro).css;
+
+/** Con la cámara trasera del celular nada va en espejo (igual que la cámara del teléfono). */
+const camaraTrasera = () => MODO_WEB && camara.lado === 'environment';
+const espejoVista = () => estado.config.captura.espejoVistaPrevia && !camaraTrasera();
+const espejoFotos = () => estado.config.captura.espejoFotos && !camaraTrasera();
 
 // ================================================================ configuración y marca
 
@@ -169,7 +191,7 @@ async function aplicarConfig() {
   $('.inicio-texto').classList.toggle('logo-grande', ocultarNombre);
 
   configurarSonidos({ sonidos: captura.sonidos, voz: captura.voz });
-  document.querySelectorAll('.video-vivo').forEach((v) => v.classList.toggle('espejo', captura.espejoVistaPrevia));
+  document.querySelectorAll('.video-vivo').forEach((v) => v.classList.toggle('espejo', espejoVista()));
 }
 
 /** Carga los diseños propios ("Mis diseños") para usarlos como plantillas. */
@@ -185,15 +207,23 @@ async function cargarDisenos() {
 }
 
 async function iniciarCamara() {
-  const { demo, error } = await camara.iniciar(estado.config.captura);
+  // en el celular se empieza con la cámara frontal (selfie)
+  const lado = MODO_WEB ? (camara.lado || 'user') : '';
+  const { demo, error } = await camara.iniciar({ ...estado.config.captura, lado });
   const avisoCamara = $('#aviso-camara');
   avisoCamara.hidden = !demo;
   if (demo) {
     const motivo = error?.name === 'NotAllowedError' ? 'permiso denegado'
       : error?.name === 'NotReadableError' ? 'la cámara está en uso por otro programa'
         : 'no se encontró ninguna cámara';
-    avisoCamara.textContent = `⚠️ Cámara de demostración (${motivo}). Revisa la cámara en Ajustes.`;
+    avisoCamara.textContent = MODO_WEB
+      ? (error?.name === 'NotAllowedError'
+        ? '📷 Para tomarte fotos, permite el uso de la cámara (toca el candado junto a la dirección y recarga la página).'
+        : `📷 No se pudo abrir la cámara (${motivo}). Cierra otras apps que la usen y recarga la página.`)
+      : `⚠️ Cámara de demostración (${motivo}). Revisa la cámara en Ajustes.`;
   }
+  document.querySelectorAll('.video-vivo').forEach((v) => v.classList.toggle('espejo', espejoVista()));
+  $('#btn-voltear').hidden = !MODO_WEB || demo || (await camara.listar()).length < 2;
   for (const video of document.querySelectorAll('video.video-vivo')) camara.conectar(video);
 
   // se reporta al servidor para poder diagnosticar (queda en la ventana del servidor)
@@ -530,7 +560,7 @@ function mostrarVistaCroma(video) {
   lienzo.height = h;
   lienzo.hidden = false;
   const ctx = lienzo.getContext('2d');
-  const pintar = () => camara.dibujar(ctx, w, h, { filtroCss: filtroCss(), espejo: estado.config.captura.espejoVistaPrevia });
+  const pintar = () => camara.dibujar(ctx, w, h, { filtroCss: filtroCss(), espejo: espejoVista() });
   pintar();
   vistaCroma.reloj = setInterval(pintar, 1000 / 24);
   vistaCroma.lienzo = lienzo;
@@ -548,7 +578,10 @@ function pasoFiltro() {
   const filtros = filtrosHabilitados();
   const preferido = estado.config.filtros.porDefecto;
   estado.filtro = filtros.some((f) => f.id === preferido) ? preferido : (filtros[0]?.id || 'normal');
-  if (!estado.config.filtros.mostrarSelector || filtros.length < 2) return iniciarCaptura();
+  // en el celular esta pantalla también sirve para cambiar entre la cámara frontal y la trasera
+  const conSelector = estado.config.filtros.mostrarSelector && filtros.length > 1;
+  if (!conSelector && $('#btn-voltear').hidden) return iniciarCaptura();
+  $('#opciones-filtro').hidden = !conSelector;
 
   const principal = $('#video-filtro');
   camara.conectar(principal);
@@ -565,7 +598,7 @@ function pasoFiltro() {
     video.playsInline = true;
     video.autoplay = true;
     video.className = 'video-vivo';
-    video.classList.toggle('espejo', estado.config.captura.espejoVistaPrevia);
+    video.classList.toggle('espejo', espejoVista());
     video.style.filter = f.css;
     camara.conectar(video);
     const nombre = document.createElement('span');
@@ -679,7 +712,7 @@ async function capturarFotos(indices, total, token) {
     hablar(t('vozSonrian'));
     await pausa(350, token);
 
-    const foto = camara.capturar({ filtroCss: filtroCss(), espejo: captura.espejoFotos });
+    const foto = camara.capturar({ filtroCss: filtroCss(), espejo: espejoFotos() });
     destello();
     mensaje('');
     estado.fotos[i] = foto;
@@ -756,7 +789,7 @@ async function capturarBoomerang(token) {
     revisarToken(token);
     const restante = Math.max(0, boomerang.segundos - (performance.now() - inicio) / 1000);
     $('#grabando-tiempo').textContent = `${restante.toFixed(1)} s`;
-    camara.dibujar(ctx, w, h, { filtroCss: filtroCss(), espejo: captura.espejoFotos });
+    camara.dibujar(ctx, w, h, { filtroCss: filtroCss(), espejo: espejoFotos() });
     decorarCuadro(ctx, w, h);
     cuadros.push(ctx.getImageData(0, 0, w, h));
     const siguiente = inicio + (n + 1) * intervalo;
@@ -814,7 +847,7 @@ async function capturarVideo(token) {
   lienzo.height = h;
   const ctx = lienzo.getContext('2d');
   const pintar = () => {
-    camara.dibujar(ctx, w, h, { filtroCss: filtroCss(), espejo: captura.espejoFotos });
+    camara.dibujar(ctx, w, h, { filtroCss: filtroCss(), espejo: espejoFotos() });
     decorarCuadro(ctx, w, h);
   };
   pintar();
@@ -1156,17 +1189,11 @@ function mostrarFinal() {
   }
   contenedor.replaceChildren(medio);
 
-  // en la versión web no se imprime desde la cabina: el invitado descarga su recuerdo
+  // en la versión web no se imprime desde la cabina: el invitado guarda su recuerdo en el celular
   const enlaceDescarga = $('#btn-descargar');
   enlaceDescarga.hidden = !MODO_WEB;
-  if (MODO_WEB) {
-    enlaceDescarga.href = resultado.url;
-    const marcaEnArchivo = (config.marca.nombre || 'recuerdo')
-      .normalize('NFD').replace(/[̀-ͯ]/g, '') // "Sonría" -> "Sonria"
-      .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-    const extension = resultado.tipo === 'video' ? 'mp4' : (estado.modo === 'foto' ? 'jpg' : 'gif');
-    enlaceDescarga.download = `${marcaEnArchivo}-${Date.now()}.${extension}`;
-  }
+  $('#btn-compartir').hidden = true;
+  if (MODO_WEB) prepararGuardado(resultado);
   const puedeImprimir = !MODO_WEB && resultado.imprimible && config.impresion.habilitada && papelDisponible() > 0;
   $('#bloque-impresion').hidden = !puedeImprimir;
   estado.copias = Math.min(config.impresion.copiasPorDefecto, copiasMaximas());
@@ -1197,6 +1224,60 @@ function mostrarFinal() {
       if (token === estado.token && estado.pantalla === 'final' && !estado.impreso) imprimirSesion();
     }, 1200);
   }
+}
+
+const EXTENSIONES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'video/mp4': 'mp4', 'video/webm': 'webm' };
+
+/** iPhone y iPad (los iPad nuevos dicen ser una Mac, pero tienen pantalla táctil). */
+const esIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+/**
+ * Versión web: botones para guardar el recuerdo en el celular y compartirlo.
+ * En Android se descarga (queda en la galería, carpeta Descargas). En iPhone la
+ * descarga abre otra ventana, así que se usa el menú de compartir, que tiene
+ * "Guardar imagen" / "Guardar video" y lo deja directo en Fotos.
+ */
+async function prepararGuardado(resultado) {
+  const enlace = $('#btn-descargar');
+  const botonCompartir = $('#btn-compartir');
+  $('#btn-terminar').textContent = t('finalOtra');
+  enlace.href = resultado.url;
+  enlace.onclick = null;
+  botonCompartir.onclick = null;
+
+  let archivo = null;
+  try {
+    const blob = await (await fetch(resultado.url)).blob();
+    const tipo = blob.type.split(';')[0];
+    const marcaEnArchivo = (estado.config.marca.nombre || 'recuerdo')
+      .normalize('NFD').replace(/[̀-ͯ]/g, '') // "Sonría" -> "Sonria"
+      .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const nombre = `${marcaEnArchivo}-${Date.now()}.${EXTENSIONES[tipo] || 'jpg'}`;
+    enlace.download = nombre;
+    archivo = new File([blob], nombre, { type: tipo });
+  } catch (err) {
+    console.error('No se pudo preparar el archivo para guardar', err);
+  }
+
+  const compartible = Boolean(archivo && navigator.canShare?.({ files: [archivo] }));
+  botonCompartir.hidden = !compartible;
+  const compartir = async () => {
+    try {
+      await navigator.share({ files: [archivo], title: estado.config.marca.nombre });
+    } catch (err) {
+      if (err.name !== 'AbortError') aviso('No se pudo compartir. Mantén presionada la foto para guardarla.', 6000);
+    }
+  };
+  enlace.onclick = (e) => {
+    if (esIOS() && compartible) {
+      e.preventDefault();
+      compartir();
+      return;
+    }
+    aviso(t('avisoGuardado'), 5000);
+  };
+  botonCompartir.onclick = compartir;
 }
 
 /** Hojas que quedan en la impresora (Infinity si no se lleva la cuenta). */
@@ -1417,7 +1498,8 @@ function vigilarInactividad() {
   document.addEventListener('keydown', marcar, true);
 
   setInterval(() => {
-    if (ajustes.abierto) return;
+    // en el celular de cada invitado nunca se vuelve solo al inicio (perdería su foto)
+    if (ajustes.abierto || MODO_WEB) return;
     const ahora = Date.now();
     if (estado.pantalla === 'final') {
       const restante = Math.ceil((estado.finHasta - ahora) / 1000);
@@ -1500,6 +1582,15 @@ function conectarEventos() {
   $('#btn-imprimir').addEventListener('click', imprimirSesion);
   $('#btn-terminar').addEventListener('click', reiniciar);
 
+  // celular: cambiar entre la cámara frontal y la trasera
+  $('#btn-voltear').addEventListener('click', async (e) => {
+    const boton = e.currentTarget;
+    boton.disabled = true;
+    camara.lado = camara.lado === 'environment' ? 'user' : 'environment';
+    await iniciarCamara();
+    boton.disabled = false;
+  });
+
   document.addEventListener('keydown', (e) => {
     if (ajustes.abierto || !$('#modal-pin').hidden) return;
     if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
@@ -1516,8 +1607,9 @@ function conectarEventos() {
     }
   });
 
+  // en la cabina no se abre el menú del clic derecho; en el celular sí (mantener presionada la foto para guardarla)
   window.addEventListener('contextmenu', (e) => {
-    if (!ajustes.abierto) e.preventDefault();
+    if (!ajustes.abierto && !MODO_WEB) e.preventDefault();
   });
 }
 
@@ -1525,6 +1617,7 @@ async function arrancar() {
   const carga = iniciarAnimacionCarga();
   MODO_WEB = await detectarModoWeb();
   document.body.classList.toggle('modo-web', MODO_WEB);
+  document.body.classList.toggle('admin', new URLSearchParams(location.search).has('ajustes'));
   estado.config = await api('/api/config');
   carga.empezar(estado.config);
   $('#video-procesando').addEventListener('error', (e) => {
