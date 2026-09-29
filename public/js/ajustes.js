@@ -104,6 +104,7 @@ const SECCIONES = [
       { ruta: 'plantillas.fuente', tipo: 'select', etiqueta: 'Tipografía', opciones: [['moderna', 'Moderna'], ['elegante', 'Elegante (manuscrita)'], ['divertida', 'Divertida'], ['clasica', 'Clásica']] },
       { ruta: 'plantillas.marcoFotos', tipo: 'bool', etiqueta: 'Marco blanco en las fotos' },
       { ruta: 'plantillas.esquinasRedondeadas', tipo: 'bool', etiqueta: 'Esquinas redondeadas' },
+      { ruta: 'plantillas.personalizar', tipo: 'bool', etiqueta: 'El invitado personaliza su diseño', ayuda: 'Después de elegir el diseño puede cambiar los colores, el formato, poner su propio texto (nombres, una frase) y subir un logo PNG. Las plantillas temáticas (Amor, Navidad, Halloween…) se activan en la lista de arriba.' },
       { h: 'Filtros' },
       { ruta: 'filtros.mostrarSelector', tipo: 'bool', etiqueta: 'Dejar que el invitado elija el filtro' },
       { ruta: 'filtros.habilitados', tipo: 'multi', etiqueta: 'Disponibles', opciones: FILTROS.map((f) => [f.id, f.nombre]) },
@@ -661,7 +662,7 @@ export class Ajustes {
     const basicas = el('input', { type: 'checkbox', checked: this.borrador.web.plantillasBasicas });
     lista.append(el('label', { class: 'celular-diseno' },
       basicas,
-      el('span', {}, el('strong', {}, 'Plantillas básicas'), el('small', {}, 'Tira clásica, postal, cuadrícula y las demás'))));
+      el('span', {}, el('strong', {}, 'Plantillas básicas y temáticas'), el('small', {}, 'Tira clásica, postal… y Amor, Navidad, Halloween, Cumpleaños y más'))));
     c.append(lista);
 
     c.append(el('p', { class: 'nota' }, 'También se publican el nombre del evento, tu logotipo, los colores, los textos, los filtros y los stickers. El PIN, la impresora, la nube y las fotos de los invitados nunca se publican.'));

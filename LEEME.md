@@ -69,6 +69,9 @@ misma proporción que la cámara (3:2 o 16:9) para que no se recorten caras.
 |---|---|
 | **Mis diseños** | Sube tu tira o postal hecha en Photoshop o Canva; la cabina detecta los recuadros y pone ahí las fotos. |
 | **Modo Fotos** | 6 plantillas: tira clásica de 4, tira de 3 (2 tiras por hoja de 10×15 cm), postal, cuadrícula, una grande y tres, retrato. |
+| **Plantillas temáticas** | 13 temas con sus adornos, colores, letra, stickers y filtro sugerido: ❤️ Amor, 🤝 Amistad, 🎄 Navidad, 🎃 Halloween, 🎂 Cumpleaños, 💍 Boda, 👑 XV años, 🎓 Graduación, 🍼 Baby shower, 🥂 Año nuevo, 🪩 Fiesta neón, 🌴 Verano y 💐 Día de la madre. Se agrupan por categoría al elegir el diseño. |
+| **Personaliza tu diseño** | Después de elegir el diseño, el invitado cambia los **colores** (3 combinaciones por tema o el color que quiera), el **formato** (tira de 3 o de 4, una foto, cuadrícula, postal), pone **su texto** (nombres, una frase) y sube **su logo en PNG**. Con vista previa en vivo. Se apaga en *Ajustes → Diseño*. |
+| **18 filtros** | Natural, blanco y negro, glamour, sepia, vintage, cálido, frío, vívido, piel suave, romántico, dorado, noche de terror, invierno, retro 70s, cine, pastel, neón y dramático. En iPhone la foto sale con el filtro igual que en la vista previa. |
 | **Modo GIF** | Varias fotos animadas en un GIF que se repite. |
 | **Modo Boomerang** | Graba un par de segundos y los reproduce hacia adelante y hacia atrás. |
 | **Modo Video** | Video mensaje con audio (MP4, compatible con iPhone y Android). |
@@ -234,7 +237,7 @@ Además, en el celular:
 - **📲 Compártela con tus amigos**: en el inicio, manda el enlace de la cabina por WhatsApp.
 
 **Qué diseños ven:** en la computadora abre *Ajustes → Celulares*, marca tus diseños (y si
-quieres, las plantillas básicas) y pulsa **🌐 Publicar en internet**. En 1 o 2 minutos aparecen
+quieres, las plantillas básicas y temáticas) y pulsa **🌐 Publicar en internet**. En 1 o 2 minutos aparecen
 en todos los celulares. También se publican el nombre del evento, el logotipo, los colores, los
 textos, los filtros y los stickers; **nunca** el PIN, la impresora, la nube ni las fotos. Ahí
 mismo está el QR del enlace para ponerlo en las mesas o mandarlo por WhatsApp.

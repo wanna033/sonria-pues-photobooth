@@ -7,7 +7,7 @@
  * Sólo se registra en la versión web (en la cabina de la PC no hace falta).
  */
 
-const CACHE = 'sonria-pues-v1';
+const CACHE = 'sonria-pues-v2';
 const ESPERA_MS = 3500;
 
 const BASICOS = [
@@ -31,6 +31,7 @@ const BASICOS = [
   'js/qr.js',
   'js/sonidos.js',
   'js/stickers.js',
+  'js/temas.js',
   'js/textos.js',
   'js/web.js',
   '../config.default.json',

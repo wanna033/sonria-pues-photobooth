@@ -505,7 +505,113 @@ h1, h2, h3 { margin: 0; }
   font-weight: 600;
   font-size: clamp(13px, 1.7vmin, 18px);
 }
-.tarjeta-filtro video { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 11px; background: #000; }
+.tarjeta-filtro video,
+.tarjeta-filtro canvas { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 11px; background: #000; }
+.tarjeta-filtro span { line-height: 1.15; }
+
+/* ---------------------------------------------------------------- chips (categorías y formatos) */
+
+.chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 2px 6px;
+}
+.chips::-webkit-scrollbar { display: none; }
+.chips[hidden] { display: none; }
+.categorias { justify-content: safe center; margin: 0 auto 12px; max-width: 1500px; width: 100%; flex-shrink: 0; }
+.chip {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: var(--superficie);
+  border: 2px solid var(--borde);
+  font-weight: 700;
+  font-size: 16px;
+  white-space: nowrap;
+}
+.chip small { font-weight: 500; opacity: 0.7; margin-left: 4px; }
+.chip.elegida { background: var(--boton-fondo, var(--degradado)); color: var(--boton-texto, #fff); border-color: transparent; }
+.tarjeta-plantilla[hidden] { display: none; }
+
+/* ---------------------------------------------------------------- personalizar */
+
+.personalizar-cuerpo {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 520px);
+  gap: clamp(14px, 3vmin, 36px);
+  min-height: 0;
+  max-width: 1500px;
+  width: 100%;
+  margin: 0 auto;
+}
+.personalizar-vista { position: relative; min-height: 0; min-width: 0; }
+/* centrada y del tamaño que quepa, sin deformarse */
+.personalizar-vista canvas {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 8px;
+  box-shadow: var(--sombra);
+}
+.personalizar-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow-y: auto;
+  padding: 4px;
+}
+.personalizar-grupo .chips { flex-wrap: wrap; overflow: visible; }
+.personalizar-grupo h3 { margin: 0 0 8px; font-size: 17px; color: var(--texto-suave); font-weight: 700; }
+.personalizar-grupo[hidden] { display: none; }
+.paletas { display: flex; flex-wrap: wrap; gap: 10px; }
+.paleta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  width: 64px;
+  height: 52px;
+  padding: 6px;
+  border-radius: 16px;
+  background: var(--superficie);
+  border: 3px solid transparent;
+  cursor: pointer;
+}
+.paleta span { width: 22px; height: 22px; border-radius: 50%; margin-left: -8px; border: 2px solid rgba(255, 255, 255, 0.9); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25); }
+.paleta span:first-child { margin-left: 0; }
+.paleta.elegida { border-color: var(--secundario); background: var(--superficie-fuerte); }
+.paleta.otra { position: relative; font-size: 24px; }
+.paleta.otra input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.campo-texto {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 16px;
+  border-radius: 14px;
+  border: 2px solid var(--borde);
+  background: var(--superficie);
+  color: var(--texto);
+  font: inherit;
+  font-size: 18px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.campo-texto:focus { outline: none; border-color: var(--secundario); }
+.fila-logo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.logo-invitado {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  border-radius: 12px;
+  background: repeating-conic-gradient(#ddd 0 25%, #fff 0 50%) 0 0 / 14px 14px;
+}
+.logo-invitado[hidden] { display: none; }
+.nota-chica { margin: 6px 0 0; font-size: 14px; color: var(--texto-suave); }
 .tarjeta-filtro.elegida { border-color: var(--secundario); background: var(--superficie-fuerte); }
 
 /* ---------------------------------------------------------------- captura */
@@ -1174,6 +1280,8 @@ h1, h2, h3 { margin: 0; }
   .inicio-texto { align-items: center; padding: 6vh 0 0; }
   .inicio-recientes { height: auto; min-height: 30vh; }
   .filtro-cuerpo, .stickers-cuerpo, .final-cuerpo { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1.3fr) minmax(0, 1fr); }
+  .personalizar-cuerpo { grid-template-columns: 1fr; grid-template-rows: minmax(0, 0.9fr) minmax(0, 1fr); }
+  .categorias { justify-content: flex-start; }
   .opciones-filtro { grid-template-columns: repeat(3, 1fr); }
   .tarjeta-modo { aspect-ratio: auto; min-height: 22vh; }
 }

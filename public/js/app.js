@@ -6,11 +6,13 @@
  */
 
 import { Camara } from './camara.js';
-import { FILTROS, filtroPorId } from './filtros.js';
+import { FILTROS, filtroPorId, dibujarConFiltro } from './filtros.js';
 import {
   PLANTILLAS, plantillaPorId, buscarPlantilla, registrarPersonalizadas, componer, cargarImagen, fotoDeMuestra,
   dibujarMarcaDeAgua, dibujarCubriendo, dibujarStickers, tamanoDePlantilla, tamanoImpresion, todasLasPlantillas,
+  plantillaTema, temaDePlantilla, configConColores,
 } from './plantillas.js';
+import { FORMATOS_TEMA, paletaDesdeColor, mezclarColor } from './temas.js';
 import { crearGifEnSegundoPlano } from './gif.js';
 import { qrSvg, generarQR } from './qr.js';
 import { configurarSonidos, pitido, obturador, exito, hablar } from './sonidos.js';
@@ -56,6 +58,8 @@ const estado = {
   datosInvitado: null, // lo que escribió en el formulario (si está activo)
   fondosVerde: [], // [{ url, imagen }] fondos de la pantalla verde ya cargados
   posesUsadas: [],
+  // lo que el invitado personalizó: colores, texto y logo (ver mostrarPersonalizar)
+  personal: { tema: '', paleta: null, texto: '', logo: null, logoUrl: '' },
 };
 
 const camara = new Camara();
@@ -383,6 +387,11 @@ function liberarSesion() {
   Object.assign(estado, {
     urls: [], fotos: [], vistas: [], compuesto: null, resultado: null, sesion: null, impreso: false, datosInvitado: null,
   });
+  // en la cabina cada invitado empieza de cero; en el celular se recuerda para la siguiente foto
+  if (!MODO_WEB) {
+    if (estado.personal.logoUrl) URL.revokeObjectURL(estado.personal.logoUrl);
+    estado.personal = personalNuevo();
+  }
 }
 
 function reiniciar() {
@@ -500,40 +509,255 @@ function elegirModo(modo) {
   if (modo === 'foto') {
     const plantillas = plantillasHabilitadas();
     if (plantillas.length > 1) return mostrarPlantillas(plantillas);
-    estado.plantilla = plantillas[0] || plantillaPorId(estado.config.plantillas.porDefecto);
+    return elegirPlantilla(plantillas[0] || plantillaPorId(estado.config.plantillas.porDefecto));
   }
   pasoFondo();
 }
 
 // ================================================================ plantillas
 
+/** Para mostrar: las tiras que se imprimen de a dos (para cortarlas) se ven como una sola. */
+function vistaSencilla(p) {
+  if (!p.duplicar) return p;
+  return { ...p, duplicar: false, ancho: p.personalizada ? p.ancho : p.ancho / 2 };
+}
+
+const categoriaDe = (p) => (p.personalizada ? t('categoriaMisDisenos') : p.categoria || t('categoriaClasicas'));
+
 function mostrarPlantillas(plantillas) {
   const contenedor = $('#opciones-plantilla');
   const muestras = [0, 1, 2, 3].map(fotoDeMuestra);
   const vertical = innerHeight > innerWidth;
-  const columnas = vertical ? 2 : (plantillas.length <= 4 ? plantillas.length : Math.ceil(plantillas.length / 2));
-  const filas = Math.ceil(plantillas.length / columnas);
-  contenedor.style.setProperty('--columnas', columnas);
-  contenedor.style.setProperty('--alto-miniatura', `${filas === 1 ? 45 : filas === 2 ? 24 : 16}vh`);
-  contenedor.replaceChildren(...plantillas.map((p, i) => {
+
+  const acomodar = (cantidad) => {
+    const columnas = vertical ? 2 : (cantidad <= 4 ? cantidad : Math.min(5, Math.ceil(cantidad / 2)));
+    const filas = Math.ceil(cantidad / columnas);
+    contenedor.style.setProperty('--columnas', columnas);
+    contenedor.style.setProperty('--alto-miniatura', `${filas === 1 ? 45 : filas === 2 ? 24 : 18}vh`);
+  };
+
+  const tarjetas = plantillas.map((p, i) => {
     const b = document.createElement('button');
     b.className = 'tarjeta-plantilla';
-    b.style.animationDelay = `${i * 0.05}s`;
-    const lienzo = componer(document.createElement('canvas'), p, muestras, {
-      config: estado.config, recursos: estado.recursos, escala: 0.22,
-    });
+    b.style.animationDelay = `${Math.min(i, 12) * 0.04}s`;
+    b.dataset.categoria = categoriaDe(p);
+    const lienzo = document.createElement('canvas');
     const nombre = document.createElement('strong');
-    nombre.textContent = p.nombre;
+    nombre.textContent = p.icono ? `${p.icono} ${p.nombre}` : p.nombre;
     const detalle = document.createElement('span');
     detalle.textContent = p.descripcion;
     b.append(lienzo, nombre, detalle);
-    b.addEventListener('click', () => {
-      estado.plantilla = p;
-      pasoFondo();
+    b.addEventListener('click', () => elegirPlantilla(p));
+    return { b, p, lienzo };
+  });
+  contenedor.replaceChildren(...tarjetas.map((x) => x.b));
+  contenedor.scrollTop = 0;
+  acomodar(tarjetas.length);
+
+  // categorías (Todas, Clásicas, Amor, Navidad…) sólo si hay de varias
+  const categorias = [...new Set(tarjetas.map((x) => x.b.dataset.categoria))];
+  const barra = $('#categorias-plantilla');
+  barra.hidden = categorias.length < 2;
+  const filtrar = (categoria) => {
+    let visibles = 0;
+    for (const { b } of tarjetas) {
+      b.hidden = Boolean(categoria) && b.dataset.categoria !== categoria;
+      if (!b.hidden) visibles++;
+    }
+    acomodar(visibles);
+    contenedor.scrollTop = 0;
+    barra.querySelectorAll('button').forEach((c) => {
+      const activa = c.dataset.categoria === (categoria || '');
+      c.classList.toggle('elegida', activa);
+      if (activa) c.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     });
-    return b;
-  }));
+  };
+  const chip = (texto, categoria, icono = '') => {
+    const c = document.createElement('button');
+    c.className = 'chip';
+    c.dataset.categoria = categoria;
+    c.textContent = icono ? `${icono} ${texto}` : texto;
+    c.addEventListener('click', () => filtrar(categoria));
+    return c;
+  };
+  const iconoDe = (categoria) => tarjetas.find((x) => x.b.dataset.categoria === categoria)?.p.icono || '';
+  barra.replaceChildren(chip(t('plantillaTodas'), ''), ...categorias.map((c) => chip(c, c, iconoDe(c))));
+  filtrar('');
   ir('plantilla');
+
+  // las miniaturas se dibujan de a poco para que la pantalla aparezca al instante
+  (async () => {
+    for (const { p, lienzo } of tarjetas) {
+      if (estado.pantalla !== 'plantilla') return;
+      componer(lienzo, vistaSencilla(p), muestras, { config: estado.config, recursos: estado.recursos, escala: 0.22 });
+      await esperar(0);
+    }
+  })();
+}
+
+function elegirPlantilla(p) {
+  estado.plantilla = p;
+  if (sePuedePersonalizar(p)) return mostrarPersonalizar();
+  pasoFondo();
+}
+
+// ================================================================ personalizar (colores, texto, logo y formato)
+
+const sePuedePersonalizar = (p) => estado.config.plantillas.personalizar !== false && !p.personalizada;
+
+const personalNuevo = () => ({ tema: '', paleta: null, texto: '', logo: null, logoUrl: '' });
+
+/** Combinaciones para las plantillas básicas (la primera es la de la marca). */
+function paletasBasicas() {
+  const { colorPrimario, colorSecundario } = estado.config.marca;
+  const p = (nombre, a, b) => ({ nombre, a, b, fondo: [a, b], texto: '#ffffff', marco: '#ffffff' });
+  return [
+    p(t('paletaMarca'), colorPrimario, colorSecundario),
+    p('Rosa', '#ff4f8b', '#8e2de2'),
+    p('Océano', '#2193b0', '#6dd5ed'),
+    p('Menta', '#11998e', '#38ef7d'),
+    p('Atardecer', '#f12711', '#f5af19'),
+    p('Noche', '#232526', '#414345'),
+    p('Oro', '#b8860b', '#1a1a1a'),
+  ];
+}
+
+/** Paleta que se ve en la plantilla actual (la elegida o la primera del tema). */
+function paletaActiva() {
+  const tema = temaDePlantilla(estado.plantilla);
+  const { paleta, tema: suTema } = estado.personal;
+  if (tema) return paleta && suTema === tema.id ? paleta : tema.paletas[0];
+  return suTema === 'basica' ? paleta : null;
+}
+
+let vistaPendiente = 0;
+
+function pintarVistaPersonalizada() {
+  cancelAnimationFrame(vistaPendiente);
+  vistaPendiente = requestAnimationFrame(() => {
+    const p = vistaSencilla(estado.plantilla);
+    const lienzo = $('#personalizar-lienzo');
+    componer(lienzo, p, [0, 1, 2, 3].map(fotoDeMuestra), {
+      config: estado.config,
+      recursos: estado.recursos,
+      escala: 820 / Math.max(p.ancho, p.alto),
+      personal: { ...estado.personal, paleta: paletaActiva() },
+    });
+  });
+}
+
+function mostrarPersonalizar() {
+  const tema = temaDePlantilla(estado.plantilla);
+  const personal = estado.personal;
+  const idTema = tema?.id || 'basica';
+  if (personal.tema !== idTema) Object.assign(personal, { tema: idTema, paleta: null });
+
+  // formato: el mismo tema acomodado de otra forma (tira, una foto, cuadrícula…)
+  const formatos = tema
+    ? Object.entries(FORMATOS_TEMA).map(([id, f]) => ({
+      id, nombre: f.nombre, fotos: f.fotos, plantilla: paraCelular(plantillaTema(tema, id)),
+    }))
+    : plantillasHabilitadas().filter((b) => !b.tema && !b.personalizada)
+      .map((b) => ({ id: b.id, nombre: b.nombre, fotos: b.fotos, plantilla: b }));
+  const idActual = () => estado.plantilla.formato || estado.plantilla.id;
+  const cajaFormatos = $('#opciones-formato');
+  $('#grupo-formato').hidden = formatos.length < 2;
+  const pintarFormatos = () => cajaFormatos.querySelectorAll('button')
+    .forEach((c) => c.classList.toggle('elegida', c.dataset.id === idActual()));
+  cajaFormatos.replaceChildren(...formatos.map((f) => {
+    const c = document.createElement('button');
+    c.className = 'chip';
+    c.dataset.id = f.id;
+    c.innerHTML = `${f.nombre} <small>${f.fotos} ${f.fotos === 1 ? 'foto' : 'fotos'}</small>`;
+    c.addEventListener('click', () => {
+      estado.plantilla = f.plantilla;
+      pintarFormatos();
+      pintarVistaPersonalizada();
+    });
+    return c;
+  }));
+  pintarFormatos();
+
+  // colores: las combinaciones del tema y uno libre
+  const paletas = tema ? tema.paletas : paletasBasicas();
+  const cajaPaletas = $('#opciones-paleta');
+  const elegirPaleta = (paleta, boton) => {
+    personal.paleta = paleta;
+    cajaPaletas.querySelectorAll('.paleta').forEach((x) => x.classList.toggle('elegida', x === boton));
+    pintarVistaPersonalizada();
+  };
+  const actual = paletaActiva();
+  const botones = paletas.map((paleta, i) => {
+    const b = document.createElement('button');
+    b.className = 'paleta';
+    b.title = paleta.nombre;
+    b.setAttribute('aria-label', paleta.nombre);
+    b.innerHTML = [paleta.fondo[0], paleta.a, paleta.b].map((c) => `<span style="background:${c}"></span>`).join('');
+    const esLaActual = actual && !actual.propia && actual.a === paleta.a && actual.b === paleta.b;
+    b.classList.toggle('elegida', actual ? Boolean(esLaActual) : i === 0);
+    b.addEventListener('click', () => elegirPaleta(paleta, b));
+    return b;
+  });
+  const otro = document.createElement('label');
+  otro.className = 'paleta otra';
+  otro.title = t('personalizarOtroColor');
+  otro.classList.toggle('elegida', Boolean(actual?.propia));
+  const selector = document.createElement('input');
+  selector.type = 'color';
+  selector.value = actual?.propia ? actual.a : (paletas[0].a || '#ff4f8b');
+  selector.setAttribute('aria-label', t('personalizarOtroColor'));
+  selector.addEventListener('input', () => {
+    const color = selector.value;
+    const paleta = tema
+      ? paletaDesdeColor(color, tema.paletas[0])
+      : { nombre: 'Tu color', propia: true, a: color, b: mezclarColor(color, '#000000', 0.45), fondo: [color, color], texto: '#ffffff', marco: '#ffffff' };
+    elegirPaleta(paleta, otro);
+  });
+  otro.append(selector, document.createTextNode('🎨'));
+  cajaPaletas.replaceChildren(...botones, otro);
+
+  // texto (nombres, frase, fecha…)
+  const texto = $('#personalizar-texto');
+  texto.value = personal.texto;
+  texto.placeholder = tema ? tema.titulo : t('personalizarTextoEjemplo');
+  pintarLogoInvitado();
+  pintarVistaPersonalizada();
+  ir('personalizar');
+}
+
+function pintarLogoInvitado() {
+  const { logo, logoUrl } = estado.personal;
+  const vista = $('#logo-invitado-vista');
+  vista.hidden = !logo;
+  if (logo) vista.src = logoUrl;
+  $('#btn-quitar-logo').hidden = !logo;
+  $('#btn-subir-logo').textContent = logo ? t('personalizarCambiarLogo') : t('personalizarSubirLogo');
+}
+
+/** Logo del invitado (PNG con fondo transparente, idealmente). Se reduce para no gastar memoria. */
+async function usarLogoInvitado(archivo) {
+  if (!archivo?.type.startsWith('image/')) return;
+  const url = URL.createObjectURL(archivo);
+  const imagen = await cargarImagen(url);
+  URL.revokeObjectURL(url);
+  if (!imagen) return aviso('😕 No se pudo abrir esa imagen', 4000);
+  const escala = Math.min(1, 1000 / Math.max(imagen.naturalWidth, imagen.naturalHeight));
+  const lienzo = document.createElement('canvas');
+  lienzo.width = Math.max(1, Math.round(imagen.naturalWidth * escala));
+  lienzo.height = Math.max(1, Math.round(imagen.naturalHeight * escala));
+  lienzo.getContext('2d').drawImage(imagen, 0, 0, lienzo.width, lienzo.height);
+  if (estado.personal.logoUrl) URL.revokeObjectURL(estado.personal.logoUrl);
+  estado.personal.logo = lienzo;
+  estado.personal.logoUrl = URL.createObjectURL(await lienzoABlob(lienzo, 'image/png'));
+  pintarLogoInvitado();
+  pintarVistaPersonalizada();
+}
+
+function quitarLogoInvitado() {
+  if (estado.personal.logoUrl) URL.revokeObjectURL(estado.personal.logoUrl);
+  Object.assign(estado.personal, { logo: null, logoUrl: '' });
+  pintarLogoInvitado();
+  pintarVistaPersonalizada();
 }
 
 // ================================================================ pantalla verde
@@ -603,7 +827,9 @@ function detenerVistaCroma() {
 
 function pasoFiltro() {
   const filtros = filtrosHabilitados();
-  const preferido = estado.config.filtros.porDefecto;
+  // cada tema sugiere su filtro (Romántico en Amor, Noche de terror en Halloween…)
+  const sugerido = estado.modo === 'foto' ? temaDePlantilla(estado.plantilla)?.filtro : '';
+  const preferido = filtros.some((f) => f.id === sugerido) ? sugerido : estado.config.filtros.porDefecto;
   estado.filtro = filtros.some((f) => f.id === preferido) ? preferido : (filtros[0]?.id || 'normal');
   // en el celular esta pantalla también sirve para cambiar entre la cámara frontal y la
   // trasera, y para usar fotos que ya están en el teléfono
@@ -617,22 +843,22 @@ function pasoFiltro() {
   principal.style.filter = filtroCss();
   mostrarVistaCroma(principal);
 
+  // miniaturas: un cuadro chico de la cámara copiado en cada una, con su filtro por CSS.
+  // Con 18 filtros es mucho más ligero que 18 videos en vivo (celulares sencillos).
   const contenedor = $('#opciones-filtro');
+  let elegida = null;
   contenedor.replaceChildren(...filtros.map((f) => {
     const b = document.createElement('button');
     b.className = 'tarjeta-filtro';
     b.classList.toggle('elegida', f.id === estado.filtro);
-    const video = document.createElement('video');
-    video.muted = true;
-    video.playsInline = true;
-    video.autoplay = true;
-    video.className = 'video-vivo';
-    video.classList.toggle('espejo', espejoVista());
-    video.style.filter = f.css;
-    camara.conectar(video);
+    if (f.id === estado.filtro) elegida = b;
+    const lienzo = document.createElement('canvas');
+    lienzo.width = MINIATURA_FILTRO.w;
+    lienzo.height = MINIATURA_FILTRO.h;
+    lienzo.style.filter = f.css;
     const nombre = document.createElement('span');
     nombre.textContent = f.nombre;
-    b.append(video, nombre);
+    b.append(lienzo, nombre);
     b.addEventListener('click', () => {
       estado.filtro = f.id;
       principal.style.filter = f.css;
@@ -640,11 +866,30 @@ function pasoFiltro() {
     });
     return b;
   }));
+  refrescarMiniaturasFiltro();
+  clearInterval(relojMiniaturasFiltro);
+  relojMiniaturasFiltro = setInterval(refrescarMiniaturasFiltro, 120);
   ir('filtro');
+  contenedor.scrollTop = 0;
+  elegida?.scrollIntoView({ block: 'nearest' }); // el filtro sugerido por el tema, a la vista
+}
+
+const MINIATURA_FILTRO = { w: 192, h: 144 };
+const cuadroMiniatura = document.createElement('canvas');
+let relojMiniaturasFiltro = 0;
+
+function refrescarMiniaturasFiltro() {
+  const lienzos = $('#opciones-filtro').querySelectorAll('canvas');
+  if (!lienzos.length) return;
+  const { w, h } = MINIATURA_FILTRO;
+  cuadroMiniatura.width = w;
+  cuadroMiniatura.height = h;
+  camara.dibujar(cuadroMiniatura.getContext('2d'), w, h, { espejo: espejoVista() });
+  for (const lienzo of lienzos) lienzo.getContext('2d').drawImage(cuadroMiniatura, 0, 0);
 }
 
 function soltarVideosFiltro() {
-  $('#opciones-filtro').querySelectorAll('video').forEach((v) => { v.srcObject = null; });
+  clearInterval(relojMiniaturasFiltro);
 }
 
 // ================================================================ captura
@@ -809,8 +1054,8 @@ async function usarFotosDeGaleria(archivos) {
       lienzo.width = Math.round(imagen.naturalWidth * escala);
       lienzo.height = Math.round(imagen.naturalHeight * escala);
       const ctx = lienzo.getContext('2d');
-      ctx.filter = filtroCss();
-      ctx.drawImage(imagen, 0, 0, lienzo.width, lienzo.height);
+      dibujarConFiltro(ctx, filtroCss(), { x: 0, y: 0, w: lienzo.width, h: lienzo.height },
+        () => ctx.drawImage(imagen, 0, 0, lienzo.width, lienzo.height));
       return lienzo;
     } finally {
       URL.revokeObjectURL(url);
@@ -1024,10 +1269,14 @@ async function continuarTrasFotos() {
   if (estado.modo === 'gif') return finalizarGif(token);
 
   estado.compuesto = componer(document.createElement('canvas'), estado.plantilla, estado.fotos, {
-    config: estado.config, recursos: estado.recursos,
+    config: estado.config, recursos: estado.recursos, personal: { ...estado.personal, paleta: paletaActiva() },
   });
   if (estado.config.stickers.habilitados) {
-    editor.preparar(estado.compuesto, estado.config.stickers.frases, estado.config.stickers.emojis);
+    // primero los stickers del tema (🎃 en Halloween, 🎄 en Navidad…) y luego los de siempre
+    const tema = temaDePlantilla(estado.plantilla);
+    const unir = (delTema = [], propios = []) => [...new Set([...delTema, ...propios])];
+    editor.preparar(estado.compuesto, unir(tema?.stickers.frases, estado.config.stickers.frases),
+      unir(tema?.stickers.emojis, estado.config.stickers.emojis));
     ir('stickers');
     return;
   }
@@ -1215,7 +1464,7 @@ async function finalizarFoto(stickers, token) {
     await esperar(50);
     if (stickers.length) {
       const { width, height } = estado.compuesto;
-      dibujarStickers(estado.compuesto.getContext('2d'), stickers, width, height, estado.config);
+      dibujarStickers(estado.compuesto.getContext('2d'), stickers, width, height, configConColores(estado.config, paletaActiva()));
     }
     const conGif = estado.config.gif.tambienEnModoFoto && estado.fotos.length > 1;
     const creada = await ponerQrEnImpresion(conGif);
@@ -1625,7 +1874,7 @@ function vigilarInactividad() {
       if (restante <= 0) reiniciar();
       return;
     }
-    const conInteraccion = ['datos', 'modo', 'plantilla', 'fondo', 'filtro', 'revision', 'stickers'];
+    const conInteraccion = ['datos', 'modo', 'plantilla', 'personalizar', 'fondo', 'filtro', 'revision', 'stickers'];
     if (conInteraccion.includes(estado.pantalla)
       && ahora - estado.ultimaActividad > estado.config.general.inactividadSegundos * 1000) {
       reiniciar();
@@ -1699,6 +1948,23 @@ function conectarEventos() {
   });
   $('#btn-imprimir').addEventListener('click', imprimirSesion);
   $('#btn-terminar').addEventListener('click', reiniciar);
+
+  // personalizar: texto, logo y seguir
+  $('#personalizar-texto').addEventListener('input', (e) => {
+    estado.personal.texto = e.target.value.slice(0, 40);
+    pintarVistaPersonalizada();
+  });
+  $('#personalizar-texto').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') e.target.blur(); // cierra el teclado del celular
+  });
+  $('#btn-subir-logo').addEventListener('click', () => $('#entrada-logo').click());
+  $('#entrada-logo').addEventListener('change', (e) => {
+    const [archivo] = e.target.files;
+    e.target.value = '';
+    usarLogoInvitado(archivo);
+  });
+  $('#btn-quitar-logo').addEventListener('click', quitarLogoInvitado);
+  $('#btn-personalizar-listo').addEventListener('click', () => pasoFondo());
 
   // celular: fotos que ya están en el teléfono
   $('#btn-galeria').addEventListener('click', () => $('#entrada-galeria').click());

@@ -7,6 +7,10 @@
  */
 
 import { t } from './textos.js';
+import {
+  TEMAS, FORMATOS_TEMA, temaPorId, luminancia, paletaOscura, mezclarColor,
+  dibujarFondoTema, dibujarEsquinas, dibujarSobreFoto, dibujarForma,
+} from './temas.js';
 
 export const PLANTILLAS = [
   {
@@ -92,6 +96,38 @@ export const PLANTILLAS = [
   },
 ];
 
+// ------------------------------------------------------------------ plantillas temáticas
+
+/**
+ * Una plantilla temática: el tema (colores y adornos) con un acomodo de fotos.
+ * El id no cambia con el formato, así "tema-amor" sigue activo en los ajustes
+ * aunque el invitado lo cambie de tira a una sola foto.
+ */
+export function plantillaTema(tema, formatoId = tema.formato) {
+  const idFormato = FORMATOS_TEMA[formatoId] ? formatoId : tema.formato;
+  const f = FORMATOS_TEMA[idFormato];
+  return {
+    id: `tema-${tema.id}`,
+    nombre: tema.nombre,
+    icono: tema.icono,
+    categoria: tema.nombre,
+    descripcion: `${f.fotos} ${f.fotos === 1 ? 'foto' : 'fotos'} · ${f.nombre.toLowerCase()}`,
+    tema: tema.id,
+    formato: idFormato,
+    fotos: f.fotos,
+    ancho: f.ancho,
+    alto: f.alto,
+    duplicar: Boolean(f.duplicar),
+    ranuras: f.ranuras,
+    pie: f.pie,
+  };
+}
+
+export const PLANTILLAS_TEMA = TEMAS.map((tema) => plantillaTema(tema));
+
+/** Tema de una plantilla (null en las básicas y en los diseños propios). */
+export const temaDePlantilla = (p) => (p?.tema ? temaPorId(p.tema) : null);
+
 // ------------------------------------------------------------------ tamaño de impresión
 
 export const PPP_IMPRESION = 300;
@@ -172,7 +208,7 @@ export function registrarPersonalizadas(lista) {
 }
 
 export function todasLasPlantillas() {
-  return [...personalizadas, ...PLANTILLAS];
+  return [...personalizadas, ...PLANTILLAS, ...PLANTILLAS_TEMA];
 }
 
 export function buscarPlantilla(id) {
@@ -224,15 +260,6 @@ function aleatorio(semilla) {
     s = (s * 1664525 + 1013904223) >>> 0;
     return s / 4294967296;
   };
-}
-
-function luminancia(hex) {
-  const n = parseInt(String(hex).replace('#', '').slice(0, 6), 16) || 0;
-  const [r, g, b] = [n >> 16, (n >> 8) & 255, n & 255].map((v) => {
-    const c = v / 255;
-    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
 const FUENTES = {
@@ -338,7 +365,16 @@ function dibujarFoto(ctx, foto, r, config) {
   ctx.restore();
 }
 
-function dibujarPie(ctx, caja, config, recursos) {
+/** Nombre de evento que trae la cabina de fábrica: no se imprime (no dice nada del evento). */
+const EVENTO_DE_FABRICA = 'Mi evento';
+
+const nombreDelEvento = (config) => {
+  const nombre = String(config.evento?.nombre || '').trim();
+  return nombre === EVENTO_DE_FABRICA ? '' : nombre;
+};
+
+/** Pie de las plantillas básicas: el nombre del evento, el mensaje, la fecha y el logo de la marca. */
+function estiloPieBasico(config, recursos, personal) {
   const fuente = FUENTES[config.plantillas.fuente] || FUENTES.moderna;
   const fondoClaro = config.plantillas.fondo === 'blanco';
   const colorTitulo = fondoClaro
@@ -346,22 +382,62 @@ function dibujarPie(ctx, caja, config, recursos) {
     : '#ffffff';
   const colorTexto = fondoClaro ? '#333333' : 'rgba(255,255,255,0.92)';
 
-  const titulo = String(config.evento.nombre || '').trim();
+  const titulo = String(personal?.texto || '').trim() || nombreDelEvento(config) || String(config.marca.nombre || '').trim();
   const subtitulo = String(config.evento.textoImpresion || '').trim();
   const detalle = [config.evento.mostrarFecha ? fechaEvento(config) : '', config.marca.nombre]
     .filter(Boolean).join('  ·  ');
 
   // sobre fondos oscuros (oscuro o degradado) se usa la versión clara del logo si existe
   const fondoOscuro = config.plantillas.fondo === 'oscuro' || config.plantillas.fondo === 'degradado';
-  const logo = (fondoOscuro && recursos.logoClaro) || recursos.logo;
-  const vertical = caja.h > caja.w * 0.35;
+  const lineas = [];
+  if (titulo) lineas.push({ texto: titulo, fuente: fuente.titulo, peso: 1, color: colorTitulo });
+  if (subtitulo) lineas.push({ texto: subtitulo, fuente: fuente.texto, peso: 0.52, color: colorTexto });
+  if (detalle) lineas.push({ texto: detalle, fuente: fuente.texto, peso: 0.4, color: colorTexto });
+  return {
+    lineas,
+    logo: personal?.logo || (fondoOscuro && recursos.logoClaro) || recursos.logo,
+    sombra: fondoClaro ? null : { color: 'rgba(0,0,0,0.25)', blur: 8 },
+  };
+}
+
+/** Pie de las plantillas temáticas: título del tema (o el texto del invitado), adorno y datos. */
+function estiloPieTema(config, recursos, tema, paleta, personal) {
+  const fuente = FUENTES[tema.fuente] || FUENTES.moderna;
+  const oscuro = paletaOscura(paleta);
+  const colorTexto = oscuro ? 'rgba(255,255,255,0.88)' : mezclarColor(paleta.texto, '#2b2b2b', 0.45);
+  const titulo = String(personal?.texto || '').trim() || tema.titulo;
+  const evento = nombreDelEvento(config);
+  const detalle = [config.evento.mostrarFecha ? fechaEvento(config) : '', config.marca.nombre]
+    .filter(Boolean).join('  ·  ');
+
+  const lineas = [{ texto: titulo, fuente: fuente.titulo, peso: 1, color: paleta.texto }];
+  if (tema.separador) lineas.push({ separador: tema.separador, color: paleta.a, peso: 0.34 });
+  if (evento) lineas.push({ texto: evento, fuente: fuente.texto, peso: 0.46, color: colorTexto });
+  if (detalle) lineas.push({ texto: detalle, fuente: fuente.texto, peso: 0.36, color: colorTexto });
+
+  // el logo del invitado va grande; el de la cabina, discreto
+  const logo = personal?.logo || (oscuro && recursos.logoClaro) || recursos.logo;
+  let sombra = oscuro ? { color: 'rgba(0,0,0,0.4)', blur: 10 } : null;
+  if (tema.brilloTexto) sombra = { color: paleta.a, blur: 26 };
+  return { lineas, logo, logoPeso: personal?.logo ? 0.4 : 0.26, sombra };
+}
+
+/**
+ * Pie de la plantilla: logo y líneas de texto (o adornos) centradas en la caja.
+ * @param {{lineas: object[], logo?: HTMLImageElement, logoPeso?: number, sombra?: {color, blur}}} estilo
+ */
+function dibujarPie(ctx, caja, estilo) {
+  const { lineas, logo, sombra } = estilo;
+  const hayTexto = lineas.some((l) => l.texto);
+  // logo arriba y texto abajo, salvo en los pies muy anchos (postal, cuadrícula)
+  const vertical = caja.h > caja.w * (estilo.logoPeso ? 0.3 : 0.35);
   let areaTexto = { ...caja };
 
   if (logo) {
-    const proporcion = logo.naturalWidth / logo.naturalHeight;
+    const proporcion = (logo.naturalWidth || logo.width) / (logo.naturalHeight || logo.height);
     let lw, lh, lx, ly;
     if (vertical) {
-      lh = caja.h * (titulo || subtitulo ? 0.42 : 0.8);
+      lh = caja.h * (hayTexto ? (estilo.logoPeso || 0.42) : 0.8);
       lw = Math.min(caja.w * 0.8, lh * proporcion);
       lh = lw / proporcion;
       lx = caja.x + (caja.w - lw) / 2;
@@ -378,31 +454,36 @@ function dibujarPie(ctx, caja, config, recursos) {
     ctx.drawImage(logo, lx, ly, lw, lh);
   }
 
-  const lineas = [];
-  if (titulo) lineas.push({ texto: titulo, fuente: fuente.titulo, peso: 1, color: colorTitulo });
-  if (subtitulo) lineas.push({ texto: subtitulo, fuente: fuente.texto, peso: 0.52, color: colorTexto });
-  if (detalle) lineas.push({ texto: detalle, fuente: fuente.texto, peso: 0.4, color: colorTexto });
-  if (!lineas.length) return;
+  if (!hayTexto) return;
 
   const pesoTotal = lineas.reduce((s, l) => s + l.peso, 0);
   const alturaBase = (areaTexto.h * 0.8) / (pesoTotal * 1.25);
-  const tamanos = lineas.map((l) => ajustarTexto(ctx, l.texto, l.fuente, alturaBase * l.peso, areaTexto.w * 0.94));
+  const tamanos = lineas.map((l) => (l.separador
+    ? alturaBase * l.peso
+    : ajustarTexto(ctx, l.texto, l.fuente, alturaBase * l.peso, areaTexto.w * 0.94)));
   const altoBloque = tamanos.reduce((s, t) => s + t * 1.25, 0);
   let y = areaTexto.y + (areaTexto.h - altoBloque) / 2;
+  const centro = areaTexto.x + areaTexto.w / 2;
 
   ctx.save();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  if (!fondoClaro) {
-    ctx.shadowColor = 'rgba(0,0,0,0.25)';
-    ctx.shadowBlur = 8;
+  if (sombra) {
+    ctx.shadowColor = sombra.color;
+    ctx.shadowBlur = sombra.blur;
     ctx.shadowOffsetY = 2;
   }
   lineas.forEach((linea, i) => {
-    ctx.font = linea.fuente(tamanos[i]);
-    ctx.fillStyle = linea.color;
     y += (tamanos[i] * 1.25) / 2;
-    ctx.fillText(linea.texto, areaTexto.x + areaTexto.w / 2, y);
+    if (linea.separador) {
+      // tres figuritas entre el título y los datos: ♥ ♥ ♥
+      const s = tamanos[i];
+      [-1.6, 0, 1.6].forEach((d, k) => dibujarForma(ctx, linea.separador, centro + d * s, y, k === 1 ? s : s * 0.7, { color: linea.color }));
+    } else {
+      ctx.font = linea.fuente(tamanos[i]);
+      ctx.fillStyle = linea.color;
+      ctx.fillText(linea.texto, centro, y);
+    }
     y += (tamanos[i] * 1.25) / 2;
   });
   ctx.restore();
@@ -458,8 +539,12 @@ export function dibujarStickers(ctx, stickers, W, H, config) {
  * @param {(CanvasImageSource|null)[]} fotos
  * @param {{config, recursos:{logo, fondo}, escala?:number, stickers?:any[]}} opciones
  */
-export function componer(lienzo, plantilla, fotos, { config, recursos = {}, escala = 1, stickers = [] }) {
+export function componer(lienzo, plantilla, fotos, { config, recursos = {}, escala = 1, stickers = [], personal = null }) {
   if (plantilla.personalizada) return componerPersonalizada(lienzo, plantilla, fotos, { config, escala, stickers });
+  const tema = temaDePlantilla(plantilla);
+  const paleta = tema ? paletaDe(tema, personal) : null;
+  const configFinal = configConColores(config, tema ? paleta : personal?.paleta);
+
   const anchoUnidad = plantilla.duplicar ? plantilla.ancho / 2 : plantilla.ancho;
   const unidad = document.createElement('canvas');
   unidad.width = Math.round(anchoUnidad * escala);
@@ -468,17 +553,89 @@ export function componer(lienzo, plantilla, fotos, { config, recursos = {}, esca
   u.scale(escala, escala);
   u.imageSmoothingQuality = 'high';
 
-  dibujarFondo(u, anchoUnidad, plantilla.alto, config, recursos);
-  plantilla.ranuras.forEach((r, i) => dibujarFoto(u, fotos[i] || null, r, config));
-  dibujarPie(u, plantilla.pie, config, recursos);
+  if (tema) {
+    dibujarFondoTema(u, anchoUnidad, plantilla.alto, tema, paleta);
+    dibujarEsquinas(u, anchoUnidad, plantilla.alto, tema, paleta, false);
+    plantilla.ranuras.forEach((r, i) => {
+      dibujarFotoTema(u, fotos[i] || null, r, tema, paleta);
+      dibujarSobreFoto(u, r, tema, paleta, i);
+    });
+    dibujarEsquinas(u, anchoUnidad, plantilla.alto, tema, paleta, true);
+    dibujarPie(u, plantilla.pie, estiloPieTema(configFinal, recursos, tema, paleta, personal));
+  } else {
+    dibujarFondo(u, anchoUnidad, plantilla.alto, configFinal, recursos);
+    plantilla.ranuras.forEach((r, i) => dibujarFoto(u, fotos[i] || null, r, configFinal));
+    dibujarPie(u, plantilla.pie, estiloPieBasico(configFinal, recursos, personal));
+  }
 
   lienzo.width = Math.round(plantilla.ancho * escala);
   lienzo.height = Math.round(plantilla.alto * escala);
   const ctx = lienzo.getContext('2d');
   ctx.drawImage(unidad, 0, 0);
   if (plantilla.duplicar) ctx.drawImage(unidad, unidad.width, 0);
-  if (stickers.length) dibujarStickers(ctx, stickers, lienzo.width, lienzo.height, config);
+  if (stickers.length) dibujarStickers(ctx, stickers, lienzo.width, lienzo.height, configFinal);
   return lienzo;
+}
+
+/** Paleta que se usa: la que eligió el invitado (si es de este tema) o la primera del tema. */
+function paletaDe(tema, personal) {
+  const elegida = personal?.paleta;
+  return elegida && (elegida.propia || tema.paletas.includes(elegida)) ? elegida : tema.paletas[0];
+}
+
+/** Los colores elegidos sustituyen a los de la marca (fondo en degradado, stickers de frase…). */
+export function configConColores(config, paleta) {
+  if (!paleta) return config;
+  return { ...config, marca: { ...config.marca, colorPrimario: paleta.a, colorSecundario: paleta.b } };
+}
+
+/** Foto de una plantilla temática: marco del color del tema (sólido, doble línea o neón). */
+function dibujarFotoTema(ctx, foto, r, tema, paleta) {
+  const lado = Math.min(r.w, r.h);
+  const radio = lado * 0.035;
+  const borde = Math.max(6, Math.round(lado * 0.03));
+  const neon = tema.marco === 'neon';
+
+  if (!neon) {
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur = borde * 2.5;
+    ctx.shadowOffsetY = borde * 0.7;
+    ctx.fillStyle = paleta.marco;
+    rectRedondeado(ctx, r.x - borde, r.y - borde, r.w + borde * 2, r.h + borde * 2, radio + borde);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.save();
+  rectRedondeado(ctx, r.x, r.y, r.w, r.h, radio);
+  ctx.clip();
+  if (foto) dibujarCubriendo(ctx, foto, r.x, r.y, r.w, r.h);
+  else {
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+  }
+  ctx.restore();
+
+  ctx.save();
+  if (tema.marco === 'doble') {
+    ctx.strokeStyle = paleta[tema.lineaMarco || 'a'];
+    ctx.lineWidth = Math.max(2, borde * 0.3);
+    const d = borde * 0.55;
+    rectRedondeado(ctx, r.x - d, r.y - d, r.w + d * 2, r.h + d * 2, radio + d);
+    ctx.stroke();
+  } else if (neon) {
+    // dos tubos de luz: el exterior de un color y el interior del otro
+    for (const [color, ancho, separacion] of [[paleta.b, borde * 0.45, borde * 0.9], [paleta.a, borde * 0.3, borde * 0.2]]) {
+      ctx.shadowColor = color;
+      ctx.shadowBlur = borde * 2.2;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = ancho;
+      rectRedondeado(ctx, r.x - separacion, r.y - separacion, r.w + separacion * 2, r.h + separacion * 2, radio + separacion);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
 }
 
 /**

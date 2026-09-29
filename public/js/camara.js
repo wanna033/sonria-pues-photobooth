@@ -4,6 +4,8 @@
  * una imagen de demostración para que la cabina se pueda probar igual.
  */
 
+import { dibujarConFiltro } from './filtros.js';
+
 /**
  * Pantalla verde (o azul): reemplaza el color del fondo por la imagen elegida.
  * "clave" mide cuánto domina el verde sobre el rojo y el azul; con orillas
@@ -185,19 +187,18 @@ export class Camara {
   /** Dibuja el cuadro actual (cubriendo w×h) en un contexto. */
   dibujar(ctx, w, h, { filtroCss = 'none', espejo = false } = {}) {
     if (this.croma?.fondo) return this.dibujarConCroma(ctx, w, h, { filtroCss, espejo });
-    ctx.save();
-    ctx.filter = filtroCss || 'none';
-    if (espejo) {
-      ctx.translate(w, 0);
-      ctx.scale(-1, 1);
-    }
-    const sw = this.ancho;
-    const sh = this.alto;
-    const escala = Math.min(sw / w, sh / h);
-    const cw = w * escala;
-    const ch = h * escala;
-    ctx.drawImage(this.fuente, (sw - cw) / 2, (sh - ch) / 2, cw, ch, 0, 0, w, h);
-    ctx.restore();
+    dibujarConFiltro(ctx, filtroCss, { x: 0, y: 0, w, h }, () => {
+      if (espejo) {
+        ctx.translate(w, 0);
+        ctx.scale(-1, 1);
+      }
+      const sw = this.ancho;
+      const sh = this.alto;
+      const escala = Math.min(sw / w, sh / h);
+      const cw = w * escala;
+      const ch = h * escala;
+      ctx.drawImage(this.fuente, (sw - cw) / 2, (sh - ch) / 2, cw, ch, 0, 0, w, h);
+    });
   }
 
   /**
@@ -236,10 +237,7 @@ export class Camara {
     const cuadro = t.getImageData(0, 0, w, h);
     aplicarCroma(cuadro.data, trabajo.fondo, this.croma);
     t.putImageData(cuadro, 0, 0);
-    ctx.save();
-    ctx.filter = filtroCss || 'none';
-    ctx.drawImage(trabajo.lienzo, 0, 0, w, h);
-    ctx.restore();
+    dibujarConFiltro(ctx, filtroCss, { x: 0, y: 0, w, h }, () => ctx.drawImage(trabajo.lienzo, 0, 0, w, h));
   }
 
   /** Activa o quita la pantalla verde. */

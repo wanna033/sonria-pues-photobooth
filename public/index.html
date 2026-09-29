@@ -93,7 +93,47 @@
       <button class="boton-volver" data-accion="atras" aria-label="Volver">‹</button>
       <h2 data-texto="plantillaTitulo">Elige tu diseño</h2>
     </header>
+    <!-- Todas · Clásicas · Amor · Navidad… (sólo si hay de varias) -->
+    <div class="chips categorias" id="categorias-plantilla" hidden></div>
     <div class="opciones-plantilla" id="opciones-plantilla"></div>
+  </section>
+
+  <!-- ============================================================ PERSONALIZAR (colores, texto, logo, formato) -->
+  <section class="pantalla" id="p-personalizar" data-pantalla="personalizar">
+    <header class="encabezado">
+      <button class="boton-volver" data-accion="atras" aria-label="Volver">‹</button>
+      <h2 data-texto="personalizarTitulo">Personaliza tu diseño</h2>
+    </header>
+    <div class="personalizar-cuerpo">
+      <div class="personalizar-vista"><canvas id="personalizar-lienzo" aria-label="Vista previa de tu diseño"></canvas></div>
+      <div class="personalizar-panel">
+        <div class="personalizar-grupo" id="grupo-formato">
+          <h3 data-texto="personalizarFormato">Formato</h3>
+          <div class="chips" id="opciones-formato"></div>
+        </div>
+        <div class="personalizar-grupo">
+          <h3 data-texto="personalizarColores">Colores</h3>
+          <div class="paletas" id="opciones-paleta"></div>
+        </div>
+        <div class="personalizar-grupo">
+          <h3 data-texto="personalizarTexto">Tu texto</h3>
+          <input class="campo-texto" id="personalizar-texto" type="text" maxlength="40" autocomplete="off" enterkeyhint="done">
+        </div>
+        <div class="personalizar-grupo">
+          <h3 data-texto="personalizarLogo">Tu logo</h3>
+          <div class="fila-logo">
+            <img class="logo-invitado" id="logo-invitado-vista" alt="Tu logo" hidden>
+            <button class="boton-secundario" id="btn-subir-logo" type="button">➕ Subir logo (PNG)</button>
+            <button class="boton-secundario" id="btn-quitar-logo" type="button" data-texto="personalizarQuitarLogo" hidden>Quitar</button>
+          </div>
+          <input type="file" id="entrada-logo" accept="image/png,image/*" hidden>
+          <p class="nota-chica" data-texto="personalizarLogoAyuda">Un PNG con fondo transparente se ve mejor</p>
+        </div>
+      </div>
+    </div>
+    <div class="barra-acciones">
+      <button class="boton-gigante" id="btn-personalizar-listo" data-texto="personalizarListo">¡Me gusta, sigamos!</button>
+    </div>
   </section>
 
   <!-- ============================================================ FONDO (pantalla verde) -->

@@ -65,14 +65,28 @@
       "cuadricula-4",
       "grande-3",
       "tira-3",
-      "retrato-1"
+      "retrato-1",
+      "tema-amor",
+      "tema-amistad",
+      "tema-navidad",
+      "tema-halloween",
+      "tema-cumpleanos",
+      "tema-boda",
+      "tema-xv",
+      "tema-graduacion",
+      "tema-babyshower",
+      "tema-anonuevo",
+      "tema-neon",
+      "tema-verano",
+      "tema-madre"
     ],
     "porDefecto": "tira-4",
     "fondo": "degradado",
     "fondoImagen": "",
     "marcoFotos": true,
     "esquinasRedondeadas": true,
-    "fuente": "moderna"
+    "fuente": "moderna",
+    "personalizar": true
   },
   "filtros": {
     "mostrarSelector": true,
@@ -85,7 +99,16 @@
       "calido",
       "frio",
       "vivido",
-      "belleza"
+      "belleza",
+      "rosa",
+      "dorado",
+      "noche",
+      "nieve",
+      "retro",
+      "cine",
+      "pastel",
+      "neon",
+      "dramatico"
     ],
     "porDefecto": "normal"
   },
