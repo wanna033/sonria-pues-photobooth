@@ -1200,6 +1200,21 @@ h1, h2, h3 { margin: 0; }
 .boton-voltear[hidden] { display: none; }
 .boton-voltear:disabled { opacity: 0.5; }
 
+/* botón discreto con aspecto de enlace (compartir la cabina, fotos sueltas) */
+.boton-enlace {
+  align-self: center;
+  padding: 10px 14px;
+  border: 0;
+  background: none;
+  color: var(--secundario);
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.boton-enlace[hidden] { display: none; }
+[data-tema="oscuro"] .boton-enlace { color: var(--primario); }
+
 /* los invitados no ven los ajustes en su celular (se abren agregando ?ajustes a la dirección) */
 body.modo-web:not(.admin) #btn-ajustes { display: none; }
 
@@ -1217,6 +1232,12 @@ body.modo-web:not(.admin) #btn-ajustes { display: none; }
     border-radius: 16px;
     font-size: 14px;
   }
+
+  /* dos botones lado a lado (uno encima del otro le quitaban espacio a la cámara) */
+  .barra-acciones { flex-wrap: nowrap; gap: 10px; margin-top: 12px; }
+  .barra-acciones > :not([hidden]) { flex: 1 1 0; min-width: 0; }
+  .barra-acciones .boton-gigante { min-height: 64px; padding: 0 16px; font-size: 20px; }
+  .barra-acciones .boton-secundario.grande { min-height: 64px; padding: 0 12px; font-size: 16px; line-height: 1.2; }
 
   /* modos en fila (ícono a la izquierda) para que quepan los cuatro */
   .opciones-modo { align-content: safe center; overflow-y: auto; gap: 12px; padding: 4px; }

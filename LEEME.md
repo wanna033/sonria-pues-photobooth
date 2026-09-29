@@ -222,6 +222,17 @@ El botón **Compartir** la manda directo a WhatsApp, Instagram, etc. La página 
 al inicio, así que nadie pierde su foto. También se puede "Agregar a la pantalla de inicio"
 para usarla como una app.
 
+Además, en el celular:
+
+- **🖼️ Usar mis fotos**: en vez de tomarlas, el invitado elige fotos que ya tiene en su galería
+  y quedan dentro del diseño (con el estilo que eligió). Si elige menos de las que lleva el
+  diseño, se repiten en orden.
+- **Guardar también las fotos sueltas**: cada foto por separado, además de la tira completa.
+- **Funciona sin señal**: después de abrirla una vez, la página carga aunque no haya internet
+  (salones con mala cobertura). Con internet siempre se usa la versión más nueva.
+- **La pantalla no se apaga** mientras posan ni mientras se crea el recuerdo.
+- **📲 Compártela con tus amigos**: en el inicio, manda el enlace de la cabina por WhatsApp.
+
 **Qué diseños ven:** en la computadora abre *Ajustes → Celulares*, marca tus diseños (y si
 quieres, las plantillas básicas) y pulsa **🌐 Publicar en internet**. En 1 o 2 minutos aparecen
 en todos los celulares. También se publican el nombre del evento, el logotipo, los colores, los

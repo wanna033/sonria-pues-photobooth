@@ -18,6 +18,8 @@ export const GRUPOS_TEXTOS = [
     claves: [
       ['inicioBoton', 'Botón para comenzar', 'Toca para comenzar'],
       ['inicioQrEvento', 'Texto junto al QR de la galería del evento', 'Todas las fotos del evento'],
+      ['inicioInvitar', 'Botón para compartir la cabina (versión para celular)', '📲 Compártela con tus amigos'],
+      ['invitarMensaje', 'Mensaje al compartir la cabina (versión para celular)', '¡Tómate fotos con tu celular en nuestra cabina! 📸'],
     ],
   },
   {
@@ -55,6 +57,7 @@ export const GRUPOS_TEXTOS = [
       ['plantillaTitulo', 'Título de los diseños', 'Elige tu diseño'],
       ['filtroTitulo', 'Título de los filtros', 'Elige un estilo'],
       ['filtroBoton', 'Botón para empezar a posar', '¡Listo, a posar!'],
+      ['filtroGaleria', 'Botón para usar fotos del teléfono (versión para celular)', '🖼️ Usar mis fotos'],
     ],
   },
   {
@@ -90,6 +93,7 @@ export const GRUPOS_TEXTOS = [
     claves: [
       ['procesandoFoto', 'Armando la impresión', 'Preparando tu impresión…'],
       ['procesandoGif', 'Creando el GIF', 'Creando tu GIF…'],
+      ['procesandoGaleria', 'Al abrir fotos del teléfono (versión para celular)', 'Abriendo tus fotos…'],
       ['procesandoGifExtra', 'GIF adicional en modo Fotos', 'Creando también tu GIF…'],
       ['procesandoBoomerang', 'Creando el boomerang', 'Creando tu boomerang…'],
       ['procesandoVideo', 'Guardando el video', 'Guardando tu video…'],
@@ -113,7 +117,9 @@ export const GRUPOS_TEXTOS = [
       ['finalDescargar', 'Botón guardar (versión para celular)', 'Guardar en mi celular'],
       ['finalCompartir', 'Botón compartir (versión para celular)', 'Compartir'],
       ['finalOtra', 'Botón para empezar otra vez (versión para celular)', 'Tomar otra'],
+      ['finalFotosSueltas', 'Botón para guardar cada foto por separado (versión para celular)', 'Guardar también las fotos sueltas'],
       ['avisoGuardado', 'Aviso al guardar (versión para celular)', '✅ Listo: quedó en tu galería (carpeta Descargas)'],
+      ['avisoPocasFotos', 'Si eligen menos fotos de las que lleva el diseño ({n})', 'Este diseño lleva {n} fotos: repetimos las que elegiste'],
       ['finalTerminar', 'Botón terminar', 'Terminar'],
       ['finalRegreso', 'Cuenta para volver al inicio ({segundos})', 'Volviendo al inicio en {segundos} s'],
       ['avisoImprimiendoUna', 'Aviso al imprimir una copia', '🖨️ Tu foto se está imprimiendo'],

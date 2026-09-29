@@ -280,7 +280,34 @@ function mostrarPantalla(nombre) {
   estado.pantalla = nombre;
   estado.ultimaActividad = Date.now();
   animacionProcesando(nombre === 'procesando');
+  if (MODO_WEB) pantallaEncendida(PANTALLAS_SIN_APAGAR.includes(nombre));
 }
+
+/** Celular: la pantalla no se apaga mientras posan ni mientras se crea el recuerdo. */
+const PANTALLAS_SIN_APAGAR = ['filtro', 'captura', 'procesando'];
+let bloqueoPantalla = null;
+let pidiendoBloqueo = false;
+
+async function pantallaEncendida(encendida) {
+  try {
+    if (encendida && !bloqueoPantalla && !pidiendoBloqueo && 'wakeLock' in navigator && document.visibilityState === 'visible') {
+      pidiendoBloqueo = true;
+      bloqueoPantalla = await navigator.wakeLock.request('screen');
+      bloqueoPantalla.addEventListener('release', () => { bloqueoPantalla = null; });
+    } else if (!encendida && bloqueoPantalla) {
+      await bloqueoPantalla.release();
+    }
+  } catch {
+    // sin soporte o sin permiso: la pantalla se comporta como siempre
+  } finally {
+    pidiendoBloqueo = false;
+  }
+}
+
+// el teléfono suelta el bloqueo al cambiar de app; al volver se pide otra vez
+document.addEventListener('visibilitychange', () => {
+  if (MODO_WEB && document.visibilityState === 'visible') pantallaEncendida(PANTALLAS_SIN_APAGAR.includes(estado.pantalla));
+});
 
 /** Mientras se crea el recuerdo se repite la animación de la marca (o la ruedita si está desactivada). */
 function animacionProcesando(activa) {
@@ -578,9 +605,11 @@ function pasoFiltro() {
   const filtros = filtrosHabilitados();
   const preferido = estado.config.filtros.porDefecto;
   estado.filtro = filtros.some((f) => f.id === preferido) ? preferido : (filtros[0]?.id || 'normal');
-  // en el celular esta pantalla también sirve para cambiar entre la cámara frontal y la trasera
+  // en el celular esta pantalla también sirve para cambiar entre la cámara frontal y la
+  // trasera, y para usar fotos que ya están en el teléfono
   const conSelector = estado.config.filtros.mostrarSelector && filtros.length > 1;
-  if (!conSelector && $('#btn-voltear').hidden) return iniciarCaptura();
+  $('#btn-galeria').hidden = !MODO_WEB || !['foto', 'gif'].includes(estado.modo);
+  if (!conSelector && $('#btn-voltear').hidden && $('#btn-galeria').hidden) return iniciarCaptura();
   $('#opciones-filtro').hidden = !conSelector;
 
   const principal = $('#video-filtro');
@@ -752,6 +781,66 @@ async function iniciarCaptura() {
     console.error(err);
     aviso(`Algo salió mal: ${err.message}`, 6000);
     reiniciar();
+  }
+}
+
+/** Lado más largo de las fotos que se traen de la galería (suficiente para imprimir 10×15 cm). */
+const LADO_MAXIMO_GALERIA = 2400;
+
+/**
+ * Celular: fotos elegidas de la galería del teléfono en vez de tomarlas. Se
+ * reducen, se les pone el estilo elegido y siguen el mismo camino que las de
+ * la cámara (revisión, stickers, diseño). Si eligen menos de las que lleva el
+ * diseño, se repiten en orden.
+ */
+async function usarFotosDeGaleria(archivos) {
+  const imagenes = archivos.filter((a) => a.type.startsWith('image/'));
+  if (!imagenes.length) return;
+  const total = estado.modo === 'foto' ? estado.plantilla.fotos : estado.config.gif.fotos;
+  if (imagenes.length < total) aviso(t('avisoPocasFotos', { n: total }), 5000);
+
+  const cargar = async (archivo) => {
+    const url = URL.createObjectURL(archivo);
+    try {
+      const imagen = await cargarImagen(url); // el navegador ya la gira según la foto (EXIF)
+      if (!imagen) return null;
+      const escala = Math.min(1, LADO_MAXIMO_GALERIA / Math.max(imagen.naturalWidth, imagen.naturalHeight));
+      const lienzo = document.createElement('canvas');
+      lienzo.width = Math.round(imagen.naturalWidth * escala);
+      lienzo.height = Math.round(imagen.naturalHeight * escala);
+      const ctx = lienzo.getContext('2d');
+      ctx.filter = filtroCss();
+      ctx.drawImage(imagen, 0, 0, lienzo.width, lienzo.height);
+      return lienzo;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  soltarVideosFiltro();
+  mostrarPantalla('procesando'); // sin guardarla en el historial: "atrás" vuelve al estilo
+  progreso(t('procesandoGaleria'), 0.1);
+  const token = ++estado.token;
+  try {
+    const cargadas = [];
+    for (const [i, archivo] of imagenes.slice(0, total).entries()) {
+      const foto = await cargar(archivo);
+      revisarToken(token);
+      if (foto) cargadas.push(foto);
+      progreso(t('procesandoGaleria'), 0.1 + ((i + 1) / Math.min(total, imagenes.length)) * 0.8);
+    }
+    if (!cargadas.length) throw new Error('No se pudieron abrir esas fotos');
+    estado.fotos = [...Array(total).keys()].map((i) => cargadas[i % cargadas.length]);
+    estado.vistas = await Promise.all(estado.fotos.map(async (f) => urlDe(await lienzoABlob(reducir(f, 640), 'image/jpeg', 0.8))));
+    revisarToken(token);
+    mostrarPantalla('filtro');
+    mostrarRevision();
+  } catch (err) {
+    if (err === CANCELADO) return;
+    console.error(err);
+    aviso(`😕 ${err.message}`, 5000);
+    mostrarPantalla('filtro');
+    pasoFiltro();
   }
 }
 
@@ -1278,6 +1367,35 @@ async function prepararGuardado(resultado) {
     aviso(t('avisoGuardado'), 5000);
   };
   botonCompartir.onclick = compartir;
+
+  // cada foto por separado (sin el diseño), para subirlas a redes o guardarlas aparte
+  const sueltas = $('#btn-fotos-sueltas');
+  sueltas.hidden = !['foto', 'gif'].includes(estado.modo) || estado.fotos.length < 2;
+  sueltas.onclick = null;
+  if (sueltas.hidden) return;
+  const nombreBase = (archivo?.name || 'recuerdo.jpg').replace(/\.[a-z0-9]+$/, '');
+  const fotos = await Promise.all(estado.fotos.map(async (f, i) => new File(
+    [await lienzoABlob(f, 'image/jpeg', 0.92)], `${nombreBase}-foto-${i + 1}.jpg`, { type: 'image/jpeg' },
+  )));
+  sueltas.onclick = async () => {
+    if (navigator.canShare?.({ files: fotos })) {
+      try {
+        await navigator.share({ files: fotos, title: estado.config.marca.nombre });
+      } catch (err) {
+        if (err.name !== 'AbortError') aviso('No se pudieron compartir las fotos', 5000);
+      }
+      return;
+    }
+    // sin menú de compartir: se descargan una por una
+    for (const foto of fotos) {
+      const a = document.createElement('a');
+      a.href = urlDe(foto);
+      a.download = foto.name;
+      a.click();
+      await esperar(400);
+    }
+    aviso(t('avisoGuardado'), 5000);
+  };
 }
 
 /** Hojas que quedan en la impresora (Infinity si no se lleva la cuenta). */
@@ -1582,6 +1700,29 @@ function conectarEventos() {
   $('#btn-imprimir').addEventListener('click', imprimirSesion);
   $('#btn-terminar').addEventListener('click', reiniciar);
 
+  // celular: fotos que ya están en el teléfono
+  $('#btn-galeria').addEventListener('click', () => $('#entrada-galeria').click());
+  $('#entrada-galeria').addEventListener('change', (e) => {
+    const archivos = [...e.target.files];
+    e.target.value = ''; // así se pueden volver a elegir las mismas
+    if (archivos.length) usarFotosDeGaleria(archivos);
+  });
+
+  // celular: mandar el enlace de la cabina a los amigos
+  $('#btn-invitar').addEventListener('click', async () => {
+    const url = location.href.split(/[?#]/)[0];
+    const datos = { title: estado.config.marca.nombre, text: t('invitarMensaje'), url };
+    try {
+      if (navigator.share) await navigator.share(datos);
+      else {
+        await navigator.clipboard.writeText(url);
+        aviso('📋 Enlace copiado: pégalo en WhatsApp');
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') aviso(`Comparte este enlace: ${url}`, 8000);
+    }
+  });
+
   // celular: cambiar entre la cámara frontal y la trasera
   $('#btn-voltear').addEventListener('click', async (e) => {
     const boton = e.currentTarget;
@@ -1618,6 +1759,9 @@ async function arrancar() {
   MODO_WEB = await detectarModoWeb();
   document.body.classList.toggle('modo-web', MODO_WEB);
   document.body.classList.toggle('admin', new URLSearchParams(location.search).has('ajustes'));
+  $('#btn-invitar').hidden = !MODO_WEB;
+  // celular: se guarda en el teléfono para que abra aunque no haya señal
+  if (MODO_WEB && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   estado.config = await api('/api/config');
   carga.empezar(estado.config);
   $('#video-procesando').addEventListener('error', (e) => {

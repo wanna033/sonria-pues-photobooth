@@ -40,6 +40,8 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3 7.2 5H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.2L15 3H9zm3 5a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
           Toca para comenzar
         </button>
+        <!-- celular: mandar el enlace de la cabina a los amigos -->
+        <button class="boton-enlace" id="btn-invitar" data-texto="inicioInvitar" hidden>📲 Compártela con tus amigos</button>
       </div>
       <div class="inicio-recientes" id="recientes" aria-hidden="true"></div>
     </div>
@@ -119,6 +121,9 @@
       <div class="opciones-filtro" id="opciones-filtro"></div>
     </div>
     <div class="barra-acciones">
+      <!-- celular: poner en el diseño fotos que ya están en el teléfono -->
+      <button class="boton-secundario grande" id="btn-galeria" data-texto="filtroGaleria" hidden>🖼️ Usar mis fotos</button>
+      <input type="file" id="entrada-galeria" accept="image/*" multiple hidden>
       <button class="boton-gigante" id="btn-filtro-listo" data-texto="filtroBoton">¡Listo, a posar!</button>
     </div>
   </section>
@@ -210,6 +215,7 @@
         </div>
         <a class="boton-gigante" id="btn-descargar" data-texto="finalDescargar" download hidden>Guardar en mi celular</a>
         <button class="boton-secundario grande" id="btn-compartir" data-texto="finalCompartir" hidden>Compartir</button>
+        <button class="boton-enlace" id="btn-fotos-sueltas" data-texto="finalFotosSueltas" hidden>Guardar también las fotos sueltas</button>
         <div class="bloque-qr" id="bloque-qr">
           <div class="qr" id="qr"></div>
           <p><span data-texto="finalQr">Escanea con tu celular para descargar</span><br><small data-texto="finalQrAyuda">(conéctate al Wi-Fi del evento)</small></p>
