@@ -53,6 +53,7 @@ export function paletaDesdeColor(color, base) {
       ? [mezclarColor(color, '#000000', 0.88), mezclarColor(color, '#000000', 0.7)]
       : [mezclarColor(color, '#ffffff', 0.93), mezclarColor(color, '#ffffff', 0.78)],
     texto: oscuro ? mezclarColor(color, '#ffffff', 0.7) : mezclarColor(color, '#000000', 0.3),
+    c: mezclarColor(color, oscuro ? '#000000' : '#ffffff', 0.6), // tercer color (banderines tricolor)
     marco: base.marco,
   };
 }
@@ -120,6 +121,85 @@ export const FORMATOS_TEMA = {
     alto: 1200,
     ranuras: [{ x: 90, y: 90, w: 1620, h: 870 }],
     pie: { x: 90, y: 985, w: 1620, h: 195 },
+  },
+  'tira-2': {
+    nombre: 'Tira de 2',
+    fotos: 2,
+    ancho: 1200,
+    alto: 1800,
+    duplicar: true,
+    ranuras: [
+      { x: 55, y: 95, w: 490, h: 540 },
+      { x: 55, y: 669, w: 490, h: 540 },
+    ],
+    pie: { x: 30, y: 1245, w: 540, h: 525 },
+  },
+  'collage-6': {
+    nombre: 'Collage de 6',
+    fotos: 6,
+    ancho: 1200,
+    alto: 1800,
+    ranuras: [
+      { x: 70, y: 95, w: 510, h: 382 },
+      { x: 620, y: 95, w: 510, h: 382 },
+      { x: 70, y: 507, w: 510, h: 382 },
+      { x: 620, y: 507, w: 510, h: 382 },
+      { x: 70, y: 919, w: 510, h: 382 },
+      { x: 620, y: 919, w: 510, h: 382 },
+    ],
+    pie: { x: 60, y: 1330, w: 1080, h: 440 },
+  },
+  'polaroid-3': {
+    nombre: 'Polaroid',
+    fotos: 3,
+    ancho: 1200,
+    alto: 1800,
+    // fotos inclinadas con marco blanco grueso abajo, como fotos instantáneas
+    ranuras: [
+      { x: 120, y: 110, w: 600, h: 450, rot: -5, polaroid: true },
+      { x: 480, y: 540, w: 600, h: 450, rot: 4, polaroid: true },
+      { x: 150, y: 970, w: 600, h: 450, rot: -3, polaroid: true },
+    ],
+    pie: { x: 60, y: 1500, w: 1080, h: 270 },
+  },
+  'historia-1': {
+    nombre: 'Historia',
+    fotos: 1,
+    ancho: 1080,
+    alto: 1920,
+    // 9:16, del tamaño de las historias de Instagram y los estados de WhatsApp
+    ranuras: [{ x: 70, y: 130, w: 940, h: 1380 }],
+    pie: { x: 60, y: 1525, w: 960, h: 260 },
+  },
+  'historia-3': {
+    nombre: 'Historia de 3',
+    fotos: 3,
+    ancho: 1080,
+    alto: 1920,
+    ranuras: [
+      { x: 70, y: 120, w: 940, h: 440 },
+      { x: 70, y: 594, w: 940, h: 440 },
+      { x: 70, y: 1068, w: 940, h: 440 },
+    ],
+    pie: { x: 60, y: 1525, w: 960, h: 260 },
+  },
+  'cuadrado-1': {
+    nombre: 'Cuadrado',
+    fotos: 1,
+    ancho: 1200,
+    alto: 1200,
+    // 1:1 para publicar en redes
+    ranuras: [{ x: 80, y: 80, w: 1040, h: 840 }],
+    pie: { x: 80, y: 945, w: 1040, h: 225 },
+  },
+  'revista': {
+    nombre: 'Portada',
+    fotos: 1,
+    ancho: 1200,
+    alto: 1800,
+    soloTema: 'revista', // la foto ocupa toda la portada; sólo para el tema Revista
+    ranuras: [{ x: 0, y: 0, w: 1200, h: 1800 }],
+    pie: null,
   },
 };
 
@@ -495,6 +575,512 @@ export const TEMAS = [
     separador: 'corazon',
     stickers: { emojis: ['💐', '🌷', '🌸', '💖', '🥰', '🌹', '🎁', '☕'], frases: ['Te quiero, mamá', 'La mejor mamá', 'Gracias, mamá'] },
   },
+  {
+    id: 'infantil',
+    nombre: 'Fiesta infantil',
+    icono: '🎠',
+    titulo: '¡Un día mágico!',
+    formato: 'tira-4',
+    fuente: 'divertida',
+    filtro: 'caramelo',
+    fondoExtra: 'rayos',
+    marco: 'solido',
+    paletas: [
+      { nombre: 'Confeti', a: '#ff4d8d', b: '#4cc9f0', fondo: ['#fff9df', '#ffe7f1'], texto: '#c9184a', marco: '#ffffff' },
+      { nombre: 'Dinosaurio', a: '#65a30d', b: '#f59e0b', fondo: ['#f7fee7', '#ecfccb'], texto: '#3f6212', marco: '#ffffff' },
+      { nombre: 'Espacio', a: '#a855f7', b: '#22d3ee', fondo: ['#12052a', '#24104f'], texto: '#f0abfc', marco: '#ffffff' },
+    ],
+    patron: [
+      { forma: 'estrella', color: ['a', 'b', '#ffd166'], cantidad: 22, tam: [0.018, 0.045], opacidad: 0.65 },
+      { forma: 'confeti', color: ['a', 'b', '#ffd166', '#8ac926'], cantidad: 48, tam: [0.012, 0.025], opacidad: 0.7 },
+      { forma: 'burbuja', color: ['a', 'b'], cantidad: 10, tam: [0.035, 0.07], opacidad: 0.28 },
+    ],
+    esquinas: [
+      { forma: 'banderines', x: 0.5, y: 0.012, tam: 0.98, anchoCompleto: true, colores: ['a', 'b', '#ffd166', '#8ac926'] },
+      { forma: 'globo', x: 0.08, y: 0.05, tam: 0.16, rot: -0.15, color: 'a', encima: true },
+      { forma: 'globo', x: 0.92, y: 0.05, tam: 0.15, rot: 0.15, color: 'b', encima: true },
+    ],
+    separador: 'estrella',
+    sobreFotos: 'estrella',
+    stickers: { emojis: ['🎠', '🦄', '🦖', '🚀', '🎈', '🍭', '🎂', '🌟'], frases: ['¡Día mágico!', 'Soy la estrella', '¡A jugar!'] },
+  },
+  {
+    id: 'corporativo',
+    nombre: 'Corporativo',
+    icono: '🏢',
+    titulo: 'Conectamos grandes ideas',
+    formato: 'postal-1',
+    fuente: 'moderna',
+    filtro: 'editorial',
+    fondoExtra: 'brillo',
+    marco: 'doble',
+    lineaMarco: 'a',
+    paletas: [
+      { nombre: 'Azul ejecutivo', a: '#2563eb', b: '#38bdf8', fondo: ['#071a33', '#0f2d52'], texto: '#dbeafe', marco: '#ffffff' },
+      { nombre: 'Grafito', a: '#d4af37', b: '#94a3b8', fondo: ['#111827', '#273449'], texto: '#f8fafc', marco: '#ffffff' },
+      { nombre: 'Innovación', a: '#06b6d4', b: '#8b5cf6', fondo: ['#f0fdfa', '#ede9fe'], texto: '#334155', marco: '#ffffff' },
+    ],
+    patron: [
+      { forma: 'hexagono', color: ['a', 'b'], cantidad: 14, tam: [0.03, 0.07], opacidad: 0.22 },
+      { forma: 'punto', color: ['a', 'b'], cantidad: 38, tam: [0.003, 0.009], opacidad: 0.4 },
+      { forma: 'chispa', color: 'a', cantidad: 6, tam: [0.015, 0.03], opacidad: 0.45 },
+    ],
+    esquinas: [
+      { forma: 'hexagono', x: 0.07, y: 0.035, tam: 0.1, color: 'a', encima: true },
+      { forma: 'hexagono', x: 0.14, y: 0.02, tam: 0.05, color: 'b', encima: true },
+      { forma: 'hexagono', x: 0.93, y: 0.965, tam: 0.08, color: 'b', encima: true },
+    ],
+    separador: 'hexagono',
+    stickers: { emojis: ['🏢', '💡', '🚀', '🤝', '📈', '🏆', '✨', '🎯'], frases: ['Gran equipo', 'Conectamos ideas', 'Juntos crecemos'] },
+  },
+  {
+    id: 'deportes',
+    nombre: 'Deportes',
+    icono: '🏆',
+    titulo: '¡Somos campeones!',
+    formato: 'cuadricula-4',
+    fuente: 'moderna',
+    filtro: 'festival',
+    fondoExtra: 'rayos',
+    marco: 'doble',
+    lineaMarco: 'b',
+    paletas: [
+      { nombre: 'Cancha', a: '#22c55e', b: '#facc15', fondo: ['#052e16', '#14532d'], texto: '#fef08a', marco: '#ffffff' },
+      { nombre: 'Azul campeón', a: '#3b82f6', b: '#f8fafc', fondo: ['#0c1e3d', '#1e40af'], texto: '#dbeafe', marco: '#ffffff' },
+      { nombre: 'Rojo pasión', a: '#ef4444', b: '#facc15', fondo: ['#450a0a', '#991b1b'], texto: '#fef3c7', marco: '#ffffff' },
+    ],
+    patron: [
+      { forma: 'balon', color: '#ffffff', cantidad: 9, tam: [0.035, 0.07], opacidad: 0.5 },
+      { forma: 'estrella', color: ['a', 'b'], cantidad: 14, tam: [0.018, 0.04], opacidad: 0.62 },
+      { forma: 'confeti', color: ['a', 'b', '#ffffff'], cantidad: 30, tam: [0.01, 0.022], opacidad: 0.55 },
+    ],
+    esquinas: [
+      { forma: 'balon', x: 0.09, y: 0.045, tam: 0.14, rot: 0.3, color: '#ffffff', encima: true },
+      { forma: 'corona', x: 0.92, y: 0.03, tam: 0.1, color: 'b', encima: true },
+      { forma: 'estrella', x: 0.92, y: 0.955, tam: 0.1, color: 'a', encima: true },
+    ],
+    separador: 'balon',
+    sobreFotos: 'estrella',
+    stickers: { emojis: ['🏆', '⚽', '🏀', '🏐', '🥇', '💪', '🔥', '🎉'], frases: ['¡Campeones!', 'Vamos equipo', 'Pasión total'] },
+  },
+  {
+    id: 'mascotas',
+    nombre: 'Mascotas',
+    icono: '🐾',
+    titulo: 'Mi mejor amigo',
+    formato: 'retrato-1',
+    fuente: 'divertida',
+    filtro: 'calido',
+    fondoExtra: 'bokeh',
+    marco: 'solido',
+    paletas: [
+      { nombre: 'Ternura', a: '#f97316', b: '#14b8a6', fondo: ['#fff7ed', '#ccfbf1'], texto: '#9a3412', marco: '#ffffff' },
+      { nombre: 'Huellitas', a: '#8b5e3c', b: '#eab676', fondo: ['#fffaf3', '#f5e6d3'], texto: '#6b3f25', marco: '#ffffff' },
+      { nombre: 'Aventura', a: '#65a30d', b: '#0ea5e9', fondo: ['#f7fee7', '#e0f2fe'], texto: '#3f6212', marco: '#ffffff' },
+    ],
+    patron: [
+      { forma: 'huella', color: ['a', 'b'], cantidad: 18, tam: [0.03, 0.06], opacidad: 0.3 },
+      { forma: 'corazon', color: ['a', 'b'], cantidad: 10, tam: [0.02, 0.04], opacidad: 0.3 },
+      { forma: 'punto', color: ['a', 'b'], cantidad: 24, tam: [0.006, 0.013], opacidad: 0.4 },
+    ],
+    esquinas: [
+      { forma: 'huella', x: 0.08, y: 0.04, tam: 0.12, rot: -0.35, color: 'a', encima: true },
+      { forma: 'huella', x: 0.16, y: 0.02, tam: 0.07, rot: -0.2, color: 'b', encima: true },
+      { forma: 'huella', x: 0.92, y: 0.96, tam: 0.1, rot: 0.3, color: 'a', encima: true },
+    ],
+    separador: 'huella',
+    sobreFotos: 'huella',
+    stickers: { emojis: ['🐾', '🐶', '🐱', '🦴', '🎾', '❤️', '🐰', '🦜'], frases: ['Mi mejor amigo', 'Amor de cuatro patas', 'Familia peluda'] },
+  },
+  {
+    id: 'comunion',
+    nombre: 'Primera comunión',
+    icono: '🕊️',
+    titulo: 'Mi primera comunión',
+    formato: 'tira-3',
+    fuente: 'clasica',
+    filtro: 'piel',
+    fondoExtra: 'brillo',
+    marco: 'doble',
+    lineaMarco: 'a',
+    paletas: [
+      { nombre: 'Blanco y oro', a: '#c9a227', b: '#ffffff', fondo: ['#fffdf5', '#f5ecd1'], texto: '#8a6a10', marco: '#ffffff' },
+      { nombre: 'Celeste', a: '#60a5fa', b: '#f8fafc', fondo: ['#f0f9ff', '#dbeafe'], texto: '#1d4ed8', marco: '#ffffff' },
+      { nombre: 'Rosa suave', a: '#e8a6b6', b: '#d4af37', fondo: ['#fff8fa', '#fce7ef'], texto: '#9f5267', marco: '#ffffff' },
+    ],
+    patron: [
+      { forma: 'paloma', color: 'a', cantidad: 6, tam: [0.05, 0.09], opacidad: 0.22 },
+      { forma: 'chispa', color: ['a', 'b'], cantidad: 16, tam: [0.014, 0.035], opacidad: 0.5 },
+      { forma: 'punto', color: 'a', cantidad: 26, tam: [0.003, 0.008], opacidad: 0.35 },
+    ],
+    esquinas: [
+      { forma: 'paloma', x: 0.1, y: 0.04, tam: 0.14, rot: -0.15, color: '#ffffff', encima: true },
+      { forma: 'cruz', x: 0.92, y: 0.035, tam: 0.09, color: 'a', encima: true },
+      { forma: 'chispa', x: 0.92, y: 0.96, tam: 0.09, color: 'a', encima: true },
+    ],
+    separador: 'cruz',
+    stickers: { emojis: ['🕊️', '🤍', '✨', '🙏', '🌿', '💐', '⭐', '🎁'], frases: ['Día bendecido', 'Mi primera comunión', 'Con amor y fe'] },
+  },
+  {
+    id: 'padre',
+    nombre: 'Día del padre',
+    icono: '👨‍👧‍👦',
+    titulo: 'El mejor papá',
+    formato: 'postal-1',
+    fuente: 'clasica',
+    filtro: 'cine',
+    fondoExtra: 'brillo',
+    marco: 'doble',
+    lineaMarco: 'a',
+    paletas: [
+      { nombre: 'Azul elegante', a: '#2563eb', b: '#d4af37', fondo: ['#eff6ff', '#dbeafe'], texto: '#1e3a8a', marco: '#ffffff' },
+      { nombre: 'Cuero', a: '#9a6a3a', b: '#d6b37a', fondo: ['#fffaf3', '#ead8bd'], texto: '#5c371d', marco: '#ffffff' },
+      { nombre: 'Noche', a: '#60a5fa', b: '#e5e7eb', fondo: ['#0f172a', '#1e293b'], texto: '#bfdbfe', marco: '#ffffff' },
+    ],
+    patron: [
+      { forma: 'corbata', color: ['a', 'b'], cantidad: 8, tam: [0.04, 0.07], opacidad: 0.3 },
+      { forma: 'bigote', color: ['a', 'b'], cantidad: 8, tam: [0.04, 0.07], opacidad: 0.3 },
+      { forma: 'estrella', color: ['a', 'b'], cantidad: 10, tam: [0.015, 0.03], opacidad: 0.4 },
+    ],
+    esquinas: [
+      { forma: 'corbata', x: 0.08, y: 0.05, tam: 0.14, rot: -0.2, color: 'a', encima: true },
+      { forma: 'bigote', x: 0.92, y: 0.965, tam: 0.12, color: 'b', encima: true },
+    ],
+    separador: 'bigote',
+    stickers: { emojis: ['👨‍👧‍👦', '🏆', '💙', '🧔', '⭐', '🎁', '💪', '👑'], frases: ['El mejor papá', 'Mi héroe', 'Te queremos, papá'] },
+  },
+  {
+    id: 'bautizo',
+    nombre: 'Bautizo',
+    icono: '🕊️',
+    titulo: 'Mi bautizo',
+    formato: 'retrato-1',
+    fuente: 'elegante',
+    filtro: 'piel',
+    fondoExtra: 'bokeh',
+    marco: 'solido',
+    paletas: [
+      { nombre: 'Celestial', a: '#7db9e8', b: '#d4af37', fondo: ['#f7fcff', '#e2f2ff'], texto: '#3b6f99', marco: '#ffffff' },
+      { nombre: 'Rosa bendición', a: '#e8a6b6', b: '#f4d58d', fondo: ['#fff9fb', '#fce8ee'], texto: '#a5576a', marco: '#ffffff' },
+      { nombre: 'Salvia', a: '#7c9a79', b: '#d9c5a1', fondo: ['#fbfcf8', '#edf3e9'], texto: '#476145', marco: '#ffffff' },
+    ],
+    patron: [
+      { forma: 'nube', color: 'b', cantidad: 6, tam: [0.07, 0.13], opacidad: 0.2 },
+      { forma: 'paloma', color: 'a', cantidad: 5, tam: [0.045, 0.08], opacidad: 0.2 },
+      { forma: 'chispa', color: ['a', 'b'], cantidad: 14, tam: [0.014, 0.035], opacidad: 0.55 },
+    ],
+    esquinas: [
+      { forma: 'nube', x: 0.12, y: 0.035, tam: 0.18, color: 'b', encima: true },
+      { forma: 'paloma', x: 0.9, y: 0.04, tam: 0.12, rot: 0.15, color: '#ffffff', encima: true },
+      { forma: 'flor', x: 0.92, y: 0.96, tam: 0.1, color: 'a', encima: true },
+    ],
+    separador: 'paloma',
+    stickers: { emojis: ['🕊️', '🤍', '👶', '✨', '🙏', '🌿', '💧', '⭐'], frases: ['Mi bautizo', 'Día de bendición', 'Con amor y fe'] },
+  },
+  {
+    id: 'revelacion',
+    nombre: 'Revelación de bebé',
+    icono: '🩷',
+    titulo: '¿Niña o niño?',
+    formato: 'cuadricula-4',
+    fuente: 'divertida',
+    filtro: 'pastel',
+    fondoExtra: 'rayos',
+    marco: 'solido',
+    paletas: [
+      { nombre: 'Rosa y azul', a: '#f58fbd', b: '#67b7e8', fondo: ['#fff5fa', '#edf8ff'], texto: '#7c4c91', marco: '#ffffff' },
+      { nombre: 'Pastel', a: '#c084fc', b: '#67e8f9', fondo: ['#faf5ff', '#ecfeff'], texto: '#7e22ce', marco: '#ffffff' },
+      { nombre: 'Fiesta', a: '#ff5d8f', b: '#3a86ff', fondo: ['#fff7ed', '#fdf2f8'], texto: '#c9184a', marco: '#ffffff' },
+    ],
+    patron: [
+      { forma: 'confeti', color: ['a', 'b', '#ffffff'], cantidad: 55, tam: [0.012, 0.028], opacidad: 0.7 },
+      { forma: 'corazon', color: ['a', 'b'], cantidad: 16, tam: [0.02, 0.045], opacidad: 0.4 },
+    ],
+    esquinas: [
+      { forma: 'banderines', x: 0.5, y: 0.012, tam: 0.98, anchoCompleto: true, colores: ['a', 'b', '#ffffff'] },
+      { forma: 'globo', x: 0.08, y: 0.05, tam: 0.16, color: 'a', encima: true },
+      { forma: 'globo', x: 0.92, y: 0.05, tam: 0.16, color: 'b', encima: true },
+    ],
+    separador: 'corazon',
+    stickers: { emojis: ['🩷', '🩵', '👶', '🎀', '🧸', '🍼', '🎉', '❓'], frases: ['¿Niña o niño?', 'La gran sorpresa', 'Team rosa · Team azul'] },
+  },
+  {
+    id: 'despedida',
+    nombre: 'Despedida',
+    icono: '🥂',
+    titulo: 'La última y nos vamos',
+    formato: 'tira-4',
+    fuente: 'divertida',
+    filtro: 'festival',
+    fondoExtra: 'brillo',
+    marco: 'neon',
+    brilloTexto: true,
+    paletas: [
+      { nombre: 'Rosa fiesta', a: '#ff2d95', b: '#ffd166', fondo: ['#220317', '#4a0730'], texto: '#ff9dcc', marco: '#ffd166' },
+      { nombre: 'Noche violeta', a: '#c026d3', b: '#22d3ee', fondo: ['#12001f', '#30105a'], texto: '#f0abfc', marco: '#22d3ee' },
+      { nombre: 'Negro y oro', a: '#d4af37', b: '#ffffff', fondo: ['#080808', '#242016'], texto: '#f8df87', marco: '#d4af37' },
+    ],
+    patron: [
+      { forma: 'chispa', color: ['a', 'b'], cantidad: 20, tam: [0.015, 0.04], opacidad: 0.8, brillo: 0.5 },
+      { forma: 'confeti', color: ['a', 'b', '#ffffff'], cantidad: 42, tam: [0.01, 0.024], opacidad: 0.6 },
+    ],
+    esquinas: [
+      { forma: 'anillos', x: 0.09, y: 0.04, tam: 0.12, color: 'b', encima: true },
+      { forma: 'corona', x: 0.92, y: 0.03, tam: 0.1, color: 'a', encima: true },
+      { forma: 'chispa', x: 0.92, y: 0.96, tam: 0.1, color: 'a', encima: true },
+    ],
+    separador: 'corona',
+    stickers: { emojis: ['🥂', '💍', '👑', '💋', '🍾', '✨', '💃', '🪩'], frases: ['Bride squad', 'Team novia', 'La última y nos vamos'] },
+  },
+  {
+    id: 'casino',
+    nombre: 'Noche de casino',
+    icono: '🎰',
+    titulo: 'Noche de suerte',
+    formato: 'postal-1',
+    fuente: 'clasica',
+    filtro: 'dorado',
+    fondoExtra: 'brillo',
+    marco: 'doble',
+    lineaMarco: 'a',
+    paletas: [
+      { nombre: 'Las Vegas', a: '#d4af37', b: '#c1121f', fondo: ['#090909', '#251707'], texto: '#f5dc86', marco: '#d4af37' },
+      { nombre: 'Rojo y negro', a: '#ef233c', b: '#f8f9fa', fondo: ['#090909', '#31070d'], texto: '#ffccd5', marco: '#ffffff' },
+      { nombre: 'Esmeralda', a: '#10b981', b: '#d4af37', fondo: ['#02150f', '#064e3b'], texto: '#a7f3d0', marco: '#d4af37' },
+    ],
+    patron: [
+      { forma: 'pica', color: ['a', 'b'], cantidad: 8, tam: [0.025, 0.05], opacidad: 0.4 },
+      { forma: 'corazon', color: ['a', 'b'], cantidad: 8, tam: [0.025, 0.05], opacidad: 0.4 },
+      { forma: 'trebol', color: ['a', 'b'], cantidad: 8, tam: [0.025, 0.05], opacidad: 0.4 },
+      { forma: 'rombo', color: ['a', 'b'], cantidad: 8, tam: [0.02, 0.045], opacidad: 0.4 },
+      { forma: 'punto', color: 'a', cantidad: 30, tam: [0.003, 0.009], opacidad: 0.65, brillo: 0.8 },
+    ],
+    esquinas: [
+      { forma: 'ficha', x: 0.08, y: 0.04, tam: 0.12, color: '#c1121f', encima: true },
+      { forma: 'ficha', x: 0.15, y: 0.025, tam: 0.08, color: '#1d3557', encima: true },
+      { forma: 'pica', x: 0.92, y: 0.96, tam: 0.1, color: 'a', encima: true },
+    ],
+    separador: 'pica',
+    stickers: { emojis: ['🎰', '🎲', '♠️', '♥️', '♦️', '♣️', '💰', '🍸'], frases: ['Noche de suerte', 'Jackpot', 'Todo al rojo'] },
+  },
+  {
+    id: 'carnaval',
+    nombre: 'Carnaval',
+    icono: '🎭',
+    titulo: '¡Que viva la fiesta!',
+    formato: 'tira-4',
+    fuente: 'divertida',
+    filtro: 'caramelo',
+    fondoExtra: 'rayos',
+    marco: 'solido',
+    paletas: [
+      { nombre: 'Carnaval', a: '#f72585', b: '#4cc9f0', fondo: ['#fff7d6', '#ffe5f1'], texto: '#b5175b', marco: '#ffffff' },
+      { nombre: 'Tropical', a: '#ff8500', b: '#06d6a0', fondo: ['#fff4dc', '#e1fff4'], texto: '#c04f00', marco: '#ffffff' },
+      { nombre: 'Noche de máscaras', a: '#b026ff', b: '#ffd166', fondo: ['#10001d', '#33005a'], texto: '#e6b3ff', marco: '#ffd166' },
+    ],
+    patron: [
+      { forma: 'confeti', color: ['a', 'b', '#ffd166', '#06d6a0'], cantidad: 70, tam: [0.01, 0.027], opacidad: 0.78 },
+      { forma: 'estrella', color: ['a', 'b'], cantidad: 14, tam: [0.018, 0.04], opacidad: 0.55 },
+    ],
+    esquinas: [
+      { forma: 'banderines', x: 0.5, y: 0.012, tam: 0.98, anchoCompleto: true, colores: ['a', 'b', '#ffd166', '#06d6a0'] },
+      { forma: 'antifaz', x: 0.13, y: 0.955, tam: 0.18, rot: -0.2, color: 'a', encima: true },
+      { forma: 'antifaz', x: 0.88, y: 0.965, tam: 0.14, rot: 0.25, color: 'b', encima: true },
+    ],
+    separador: 'antifaz',
+    stickers: { emojis: ['🎭', '🎉', '🥳', '🎺', '💃', '🪇', '✨', '🎊'], frases: ['¡Viva la fiesta!', 'Carnaval total', 'Pura alegría'] },
+  },
+  {
+    id: 'revista',
+    nombre: 'Portada de revista',
+    icono: '📰',
+    titulo: 'ESTRELLA',
+    formato: 'revista',
+    formatos: ['revista'],
+    portada: true,
+    fuente: 'clasica',
+    filtro: 'editorial',
+    marco: 'solido',
+    // titulares de la portada (el primero se cambia por el nombre del evento si lo hay)
+    titulares: ['Los mejores momentos de la noche', 'EXCLUSIVA: ¡la foto del año!', 'Estilo, risas y mucho amor'],
+    paletas: [
+      { nombre: 'Rojo clásico', a: '#e63946', b: '#ffffff', fondo: ['#111111', '#111111'], texto: '#ffffff', marco: '#ffffff' },
+      { nombre: 'Blanco y oro', a: '#ffffff', b: '#ffd166', fondo: ['#111111', '#111111'], texto: '#ffffff', marco: '#ffffff' },
+      { nombre: 'Rosa', a: '#ff4f9a', b: '#ffffff', fondo: ['#111111', '#111111'], texto: '#ffffff', marco: '#ffffff' },
+    ],
+    patron: [],
+    esquinas: [],
+    stickers: { emojis: ['⭐', '📸', '💋', '🔥', '💎', '👑', '✨', '😎'], frases: ['Exclusiva', 'La foto del año', 'Edición especial'] },
+  },
+  {
+    id: 'muertos',
+    nombre: 'Día de muertos',
+    icono: '💀',
+    titulo: 'Día de muertos',
+    formato: 'tira-3',
+    fuente: 'divertida',
+    filtro: 'calido',
+    fondoExtra: 'bokeh',
+    marco: 'doble',
+    lineaMarco: 'a',
+    paletas: [
+      { nombre: 'Cempasúchil', a: '#ff8c00', b: '#e0218a', fondo: ['#1a0b2e', '#3d1458'], texto: '#ffb627', marco: '#fff4e0' },
+      { nombre: 'Papel picado', a: '#e0218a', b: '#00b4d8', fondo: ['#fff6e9', '#ffe1c2'], texto: '#8f1d5b', marco: '#ffffff' },
+      { nombre: 'Noche de velas', a: '#ffb627', b: '#7b2cbf', fondo: ['#0b0b0b', '#241040'], texto: '#ffd166', marco: '#fff4e0' },
+    ],
+    patron: [
+      { forma: 'cempasuchil', color: '#ff9f1c', cantidad: 10, tam: [0.04, 0.07], opacidad: 0.55 },
+      { forma: 'calavera', color: '#fff8f0', cantidad: 4, tam: [0.05, 0.08], opacidad: 0.3 },
+      { forma: 'punto', color: ['a', 'b', '#ffd166'], cantidad: 30, tam: [0.004, 0.01], opacidad: 0.6 },
+    ],
+    esquinas: [
+      { forma: 'banderines', x: 0.5, y: 0.012, tam: 0.98, anchoCompleto: true, colores: ['#e0218a', '#ff8c00', '#00b4d8', '#8ac926', '#7b2cbf'] },
+      { forma: 'calavera', x: 0.12, y: 0.955, tam: 0.16, rot: -0.15, color: '#fff8f0', encima: true },
+      { forma: 'cempasuchil', x: 0.88, y: 0.96, tam: 0.12, color: '#ff9f1c', encima: true },
+    ],
+    separador: 'cempasuchil',
+    stickers: { emojis: ['💀', '🌼', '🕯️', '🎭', '🌮', '💐', '🦋', '🍞'], frases: ['Día de muertos', 'Siempre en el corazón', '¡Viva la vida!'] },
+  },
+  {
+    id: 'aniversario',
+    nombre: 'Aniversario',
+    icono: '💞',
+    titulo: 'Feliz aniversario',
+    formato: 'retrato-1',
+    fuente: 'elegante',
+    filtro: 'rosa',
+    fondoExtra: 'bokeh',
+    marco: 'doble',
+    lineaMarco: 'a',
+    paletas: [
+      { nombre: 'Oro', a: '#c9a227', b: '#e8c1c5', fondo: ['#fffaf3', '#f6ebe0'], texto: '#8a6d1f', marco: '#ffffff' },
+      { nombre: 'Rubí', a: '#e0457b', b: '#f9a8d4', fondo: ['#2a0a16', '#4c0d27'], texto: '#fde2ec', marco: '#fde2ec' },
+      { nombre: 'Plata', a: '#8e9aaf', b: '#cbc0d3', fondo: ['#fbfbfd', '#eceef4'], texto: '#4a5068', marco: '#ffffff' },
+    ],
+    patron: [
+      { forma: 'corazon', color: ['a', 'b'], cantidad: 14, tam: [0.02, 0.05], opacidad: 0.25 },
+      { forma: 'chispa', color: 'a', cantidad: 12, tam: [0.015, 0.035], opacidad: 0.5 },
+      { forma: 'punto', color: 'a', cantidad: 24, tam: [0.003, 0.008], opacidad: 0.35 },
+    ],
+    esquinas: [
+      { forma: 'anillos', x: 0.08, y: 0.04, tam: 0.12, color: 'a', encima: true },
+      { forma: 'corazon', x: 0.92, y: 0.965, tam: 0.1, rot: 0.2, color: 'b', encima: true },
+    ],
+    separador: 'anillos',
+    stickers: { emojis: ['💞', '🥂', '💍', '🌹', '🍾', '❤️', '📸', '✨'], frases: ['Feliz aniversario', 'Juntos siempre', 'Te elegiría otra vez'] },
+  },
+  {
+    id: 'vaquero',
+    nombre: 'Vaquero',
+    icono: '🤠',
+    titulo: '¡Yiija!',
+    formato: 'tira-3',
+    fuente: 'clasica',
+    filtro: 'retro',
+    fondoExtra: 'rayos',
+    marco: 'doble',
+    lineaMarco: 'a',
+    paletas: [
+      { nombre: 'Rancho', a: '#b5651d', b: '#e9b949', fondo: ['#fdf3e1', '#f1d9b5'], texto: '#6f3b12', marco: '#fffaf0' },
+      { nombre: 'Cuero', a: '#d4a373', b: '#faedcd', fondo: ['#3b2416', '#5c3a21'], texto: '#faedcd', marco: '#faedcd' },
+      { nombre: 'Denim', a: '#e76f51', b: '#f2cc8f', fondo: ['#1f3b57', '#2f5d8a'], texto: '#f2cc8f', marco: '#ffffff' },
+    ],
+    patron: [
+      { forma: 'herradura', color: 'a', cantidad: 8, tam: [0.035, 0.06], opacidad: 0.3 },
+      { forma: 'estrella', color: 'b', cantidad: 12, tam: [0.02, 0.04], opacidad: 0.55 },
+      { forma: 'punto', color: 'a', cantidad: 26, tam: [0.004, 0.009], opacidad: 0.35 },
+    ],
+    esquinas: [
+      { forma: 'sombrero', x: 0.12, y: 0.035, tam: 0.2, rot: -0.12, color: 'a', encima: true },
+      { forma: 'herradura', x: 0.9, y: 0.965, tam: 0.1, rot: 0.2, color: 'b', encima: true },
+    ],
+    separador: 'estrella',
+    stickers: { emojis: ['🤠', '🐴', '🌵', '🐂', '⭐', '🎸', '🍺', '🔥'], frases: ['¡Yiija!', 'Cowboy style', 'Pura fiesta country'] },
+  },
+  {
+    id: 'hawaiana',
+    nombre: 'Hawaiana',
+    icono: '🌺',
+    titulo: 'Aloha',
+    formato: 'retrato-1',
+    fuente: 'divertida',
+    filtro: 'vivido',
+    fondoExtra: 'ondas',
+    marco: 'solido',
+    paletas: [
+      { nombre: 'Tropical', a: '#ff4d6d', b: '#2ec4b6', fondo: ['#fff4e6', '#ffe0c7'], texto: '#d62f55', marco: '#ffffff' },
+      { nombre: 'Laguna', a: '#ff9f1c', b: '#0096c7', fondo: ['#e6fbff', '#cdf3ff'], texto: '#006d8f', marco: '#ffffff' },
+      { nombre: 'Atardecer', a: '#ffd166', b: '#ef476f', fondo: ['#3a0f3f', '#a4304f'], texto: '#ffe3a3', marco: '#fff4e0' },
+    ],
+    patron: [
+      { forma: 'hibisco', color: ['a', 'b'], cantidad: 9, tam: [0.04, 0.08], opacidad: 0.35 },
+      { forma: 'hoja', color: '#2a9d8f', cantidad: 9, tam: [0.04, 0.08], opacidad: 0.3 },
+      { forma: 'punto', color: 'a', cantidad: 20, tam: [0.005, 0.011], opacidad: 0.4 },
+    ],
+    esquinas: [
+      { forma: 'hibisco', x: 0.07, y: 0.04, tam: 0.14, rot: 0.2, color: 'a', encima: true },
+      { forma: 'hoja', x: 0.15, y: 0.03, tam: 0.1, rot: 1.3, color: '#2a9d8f', encima: true },
+      { forma: 'sol', x: 0.9, y: 0.045, tam: 0.18, color: '#ffd166', encima: true },
+      { forma: 'hibisco', x: 0.93, y: 0.965, tam: 0.1, color: 'b', encima: true },
+    ],
+    separador: 'hibisco',
+    stickers: { emojis: ['🌺', '🌴', '🍍', '🥥', '🏄', '🌊', '🍹', '🤙'], frases: ['Aloha', 'Good vibes', 'Island time'] },
+  },
+  {
+    id: 'patrio',
+    nombre: 'Fiesta patria',
+    icono: '🎆',
+    titulo: '¡Viva mi tierra!',
+    formato: 'tira-4',
+    fuente: 'clasica',
+    filtro: 'vivido',
+    fondoExtra: 'rayos',
+    marco: 'solido',
+    paletas: [
+      { nombre: 'Amarillo, azul y rojo', a: '#fcd116', b: '#003893', c: '#ce1126', fondo: ['#fffdf3', '#fff4c7'], texto: '#003893', marco: '#ffffff' },
+      { nombre: 'Verde, blanco y rojo', a: '#006847', b: '#ce1126', c: '#ffffff', fondo: ['#fbfff9', '#f1faef'], texto: '#006847', marco: '#ffffff' },
+      { nombre: 'Azul, blanco y rojo', a: '#0033a0', b: '#d52b1e', c: '#ffffff', fondo: ['#f5f8ff', '#e6ecff'], texto: '#0033a0', marco: '#ffffff' },
+    ],
+    patron: [
+      { forma: 'estrella', color: ['a', 'b', 'c'], cantidad: 16, tam: [0.02, 0.045], opacidad: 0.55 },
+      { forma: 'confeti', color: ['a', 'b', 'c'], cantidad: 40, tam: [0.012, 0.026], opacidad: 0.6 },
+    ],
+    esquinas: [
+      { forma: 'banderines', x: 0.5, y: 0.012, tam: 0.98, anchoCompleto: true, colores: ['a', 'b', 'c'] },
+      { forma: 'estrella', x: 0.92, y: 0.955, tam: 0.1, color: 'a', encima: true },
+    ],
+    separador: 'estrella',
+    stickers: { emojis: ['🎆', '🎉', '⭐', '🎺', '🥁', '💃', '🇨🇴', '🇲🇽'], frases: ['¡Viva mi tierra!', 'Orgullo patrio', '¡Que viva la fiesta!'] },
+  },
+  {
+    id: 'rock',
+    nombre: 'Rock',
+    icono: '🎸',
+    titulo: 'Rock & Roll',
+    formato: 'tira-4',
+    fuente: 'moderna',
+    filtro: 'dramatico',
+    fondoExtra: 'brillo',
+    marco: 'doble',
+    lineaMarco: 'a',
+    brilloTexto: true,
+    paletas: [
+      { nombre: 'Eléctrico', a: '#ffea00', b: '#ff006e', fondo: ['#0a0a0a', '#1c1c1c'], texto: '#ffea00', marco: '#161616' },
+      { nombre: 'Metal', a: '#e5e5e5', b: '#ff2e2e', fondo: ['#050505', '#2b0000'], texto: '#f1f1f1', marco: '#1a1a1a' },
+      { nombre: 'Punk', a: '#39ff14', b: '#ff00a0', fondo: ['#0d0014', '#260033'], texto: '#39ff14', marco: '#141414' },
+    ],
+    patron: [
+      { forma: 'rayo', color: ['a', 'b'], cantidad: 10, tam: [0.03, 0.06], opacidad: 0.5 },
+      { forma: 'nota', color: ['a', 'b'], cantidad: 8, tam: [0.03, 0.05], opacidad: 0.4 },
+      { forma: 'estrella', color: 'a', cantidad: 10, tam: [0.012, 0.025], opacidad: 0.6, brillo: 0.6 },
+    ],
+    esquinas: [
+      { forma: 'rayo', x: 0.08, y: 0.04, tam: 0.13, rot: -0.2, color: 'a', encima: true },
+      { forma: 'nota', x: 0.92, y: 0.955, tam: 0.1, rot: 0.15, color: 'b', encima: true },
+    ],
+    separador: 'rayo',
+    stickers: { emojis: ['🎸', '🤘', '🎤', '🥁', '⚡', '🔥', '😎', '🎶'], frases: ['Rock & Roll', '¡Arriba el rock!', 'Modo concierto'] },
+  },
 ];
 
 export const temaPorId = (id) => TEMAS.find((t) => t.id === id) || null;
@@ -565,6 +1151,17 @@ const FORMAS = {
 
   confeti(ctx, s) {
     ctx.fillRect(-s / 2, -s * 0.22, s, s * 0.44);
+  },
+
+  rombo(ctx, s) {
+    const R = s / 2;
+    ctx.beginPath();
+    ctx.moveTo(0, -R);
+    ctx.lineTo(R * 0.72, 0);
+    ctx.lineTo(0, R);
+    ctx.lineTo(-R * 0.72, 0);
+    ctx.closePath();
+    ctx.fill();
   },
 
   punto(ctx, s) {
@@ -883,12 +1480,426 @@ const FORMAS = {
       ctx.fill();
     }
   },
+
+  huella(ctx, s) {
+    const R = s / 2;
+    ctx.beginPath();
+    ctx.ellipse(0, 0.25 * R, 0.4 * R, 0.33 * R, 0, 0, Math.PI * 2);
+    ctx.fill();
+    for (const [x, y, r] of [[-0.45, -0.22, 0.15], [-0.16, -0.5, 0.16], [0.16, -0.5, 0.16], [0.45, -0.22, 0.15]]) {
+      ctx.beginPath();
+      ctx.ellipse(x * R, y * R, r * R, r * R * 1.2, x * 0.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+
+  balon(ctx, s) {
+    const R = s / 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = '#1a1a1a';
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = Math.max(1, R * 0.06);
+    const pentagono = (cx, cy, r, giro) => {
+      ctx.beginPath();
+      for (let i = 0; i < 5; i++) {
+        const a = giro + (i * Math.PI * 2) / 5;
+        ctx.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+      }
+      ctx.closePath();
+      ctx.fill();
+    };
+    pentagono(0, 0, R * 0.32, -Math.PI / 2);
+    for (let i = 0; i < 5; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI * 2) / 5;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * R * 0.32, Math.sin(a) * R * 0.32);
+      ctx.lineTo(Math.cos(a) * R * 0.72, Math.sin(a) * R * 0.72);
+      ctx.stroke();
+      pentagono(Math.cos(a) * R * 1.02, Math.sin(a) * R * 1.02, R * 0.3, a + Math.PI / 5);
+    }
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = Math.max(1, R * 0.05);
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0, Math.PI * 2);
+    ctx.stroke();
+  },
+
+  /** Pica de la baraja (♠). */
+  pica(ctx, s) {
+    const R = s / 2;
+    ctx.save();
+    ctx.rotate(Math.PI);
+    ctx.translate(0, 0.12 * R);
+    FORMAS.corazon(ctx, s * 0.95);
+    ctx.restore();
+    ctx.beginPath();
+    ctx.moveTo(0, 0.2 * R);
+    ctx.lineTo(0.22 * R, 0.95 * R);
+    ctx.lineTo(-0.22 * R, 0.95 * R);
+    ctx.closePath();
+    ctx.fill();
+  },
+
+  /** Trébol de la baraja (♣). */
+  trebol(ctx, s) {
+    const R = s / 2;
+    for (const [x, y] of [[0, -0.45], [-0.42, 0.08], [0.42, 0.08]]) {
+      ctx.beginPath();
+      ctx.arc(x * R, y * R, 0.32 * R, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0.2 * R, 0.95 * R);
+    ctx.lineTo(-0.2 * R, 0.95 * R);
+    ctx.closePath();
+    ctx.fill();
+  },
+
+  /** Ficha de casino. */
+  ficha(ctx, s) {
+    const R = s / 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    for (let i = 0; i < 8; i++) {
+      ctx.save();
+      ctx.rotate((i * Math.PI) / 4);
+      ctx.fillRect(-0.1 * R, -R, 0.2 * R, 0.24 * R);
+      ctx.restore();
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = Math.max(1, R * 0.06);
+    ctx.setLineDash([R * 0.12, R * 0.1]);
+    ctx.beginPath();
+    ctx.arc(0, 0, R * 0.6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  },
+
+  paloma(ctx, s) {
+    const R = s / 2;
+    ctx.beginPath(); // cuerpo
+    ctx.ellipse(-0.05 * R, 0.12 * R, 0.55 * R, 0.26 * R, -0.25, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath(); // cabeza
+    ctx.arc(0.48 * R, -0.18 * R, 0.17 * R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath(); // cola
+    ctx.moveTo(-0.5 * R, 0.2 * R);
+    ctx.lineTo(-R, 0.05 * R);
+    ctx.lineTo(-0.92 * R, 0.42 * R);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath(); // ala
+    ctx.moveTo(-0.25 * R, 0.02 * R);
+    ctx.bezierCurveTo(-0.35 * R, -0.7 * R, 0.15 * R, -0.95 * R, 0.25 * R, -0.85 * R);
+    ctx.bezierCurveTo(0.1 * R, -0.45 * R, 0.15 * R, -0.1 * R, 0.2 * R, 0.02 * R);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#f4a261'; // pico
+    ctx.beginPath();
+    ctx.moveTo(0.63 * R, -0.2 * R);
+    ctx.lineTo(0.82 * R, -0.13 * R);
+    ctx.lineTo(0.62 * R, -0.1 * R);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#2b2b2b'; // ojo
+    ctx.beginPath();
+    ctx.arc(0.52 * R, -0.22 * R, 0.03 * R, 0, Math.PI * 2);
+    ctx.fill();
+  },
+
+  cruz(ctx, s) {
+    const R = s / 2;
+    ctx.beginPath();
+    ctx.roundRect(-0.13 * R, -R, 0.26 * R, 2 * R, 0.08 * R);
+    ctx.roundRect(-0.6 * R, -0.52 * R, 1.2 * R, 0.26 * R, 0.08 * R);
+    ctx.fill();
+  },
+
+  corbata(ctx, s) {
+    const R = s / 2;
+    ctx.beginPath(); // nudo
+    ctx.moveTo(-0.22 * R, -R);
+    ctx.lineTo(0.22 * R, -R);
+    ctx.lineTo(0.14 * R, -0.68 * R);
+    ctx.lineTo(-0.14 * R, -0.68 * R);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath(); // cuerpo
+    ctx.moveTo(-0.13 * R, -0.64 * R);
+    ctx.lineTo(0.13 * R, -0.64 * R);
+    ctx.lineTo(0.32 * R, 0.7 * R);
+    ctx.lineTo(0, R);
+    ctx.lineTo(-0.32 * R, 0.7 * R);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = Math.max(1, R * 0.06);
+    ctx.beginPath();
+    for (const y of [-0.3, 0.05, 0.4]) {
+      ctx.moveTo(-0.22 * R, y * R);
+      ctx.lineTo(0.22 * R, (y - 0.18) * R);
+    }
+    ctx.stroke();
+  },
+
+  /** Antifaz de carnaval (con los ojos huecos). */
+  antifaz(ctx, s) {
+    const R = s / 2;
+    ctx.beginPath();
+    ctx.moveTo(-R, -0.25 * R);
+    ctx.bezierCurveTo(-0.6 * R, -0.5 * R, -0.2 * R, -0.35 * R, 0, -0.2 * R);
+    ctx.bezierCurveTo(0.2 * R, -0.35 * R, 0.6 * R, -0.5 * R, R, -0.25 * R);
+    ctx.bezierCurveTo(0.95 * R, 0.25 * R, 0.55 * R, 0.45 * R, 0.25 * R, 0.3 * R);
+    ctx.quadraticCurveTo(0, 0.12 * R, -0.25 * R, 0.3 * R);
+    ctx.bezierCurveTo(-0.55 * R, 0.45 * R, -0.95 * R, 0.25 * R, -R, -0.25 * R);
+    ctx.closePath();
+    ctx.ellipse(-0.45 * R, -0.02 * R, 0.22 * R, 0.14 * R, 0.15, 0, Math.PI * 2);
+    ctx.ellipse(0.45 * R, -0.02 * R, 0.22 * R, 0.14 * R, -0.15, 0, Math.PI * 2);
+    ctx.fill('evenodd');
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    for (const x of [-0.75, -0.2, 0.2, 0.75]) {
+      ctx.beginPath();
+      ctx.arc(x * R, -0.3 * R, 0.05 * R, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+
+  bigote(ctx, s) {
+    const R = s / 2;
+    ctx.beginPath();
+    ctx.moveTo(0, -0.1 * R);
+    ctx.bezierCurveTo(-0.3 * R, -0.45 * R, -0.75 * R, -0.2 * R, -0.85 * R, 0.1 * R);
+    ctx.bezierCurveTo(-0.95 * R, -0.1 * R, -R, -0.3 * R, -0.85 * R, -0.35 * R);
+    ctx.bezierCurveTo(-1.05 * R, -0.25 * R, -1.02 * R, 0.25 * R, -0.7 * R, 0.25 * R);
+    ctx.bezierCurveTo(-0.4 * R, 0.3 * R, -0.15 * R, 0.1 * R, 0, 0.12 * R);
+    ctx.bezierCurveTo(0.15 * R, 0.1 * R, 0.4 * R, 0.3 * R, 0.7 * R, 0.25 * R);
+    ctx.bezierCurveTo(1.02 * R, 0.25 * R, 1.05 * R, -0.25 * R, 0.85 * R, -0.35 * R);
+    ctx.bezierCurveTo(R, -0.3 * R, 0.95 * R, -0.1 * R, 0.85 * R, 0.1 * R);
+    ctx.bezierCurveTo(0.75 * R, -0.2 * R, 0.3 * R, -0.45 * R, 0, -0.1 * R);
+    ctx.fill();
+  },
+
+  /** Calavera de azúcar (Día de muertos). */
+  calavera(ctx, s) {
+    const R = s / 2;
+    ctx.beginPath();
+    ctx.arc(0, -0.15 * R, 0.72 * R, Math.PI * 0.85, Math.PI * 0.15);
+    ctx.lineTo(0.42 * R, 0.55 * R);
+    ctx.quadraticCurveTo(0, 0.85 * R, -0.42 * R, 0.55 * R);
+    ctx.closePath();
+    ctx.fill();
+    // ojos con flores
+    for (const d of [-1, 1]) {
+      ctx.fillStyle = '#1a1a1a';
+      ctx.beginPath();
+      ctx.arc(d * 0.3 * R, -0.1 * R, 0.2 * R, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = d < 0 ? '#e0218a' : '#00b4d8';
+      for (let k = 0; k < 6; k++) {
+        const a = (k * Math.PI) / 3;
+        ctx.beginPath();
+        ctx.arc(d * 0.3 * R + Math.cos(a) * 0.09 * R, -0.1 * R + Math.sin(a) * 0.09 * R, 0.055 * R, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = '#ffd166';
+      ctx.beginPath();
+      ctx.arc(d * 0.3 * R, -0.1 * R, 0.05 * R, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#1a1a1a'; // nariz
+    ctx.save();
+    ctx.translate(0, 0.2 * R);
+    ctx.rotate(Math.PI);
+    FORMAS.corazon(ctx, 0.2 * R);
+    ctx.restore();
+    ctx.strokeStyle = '#1a1a1a'; // dientes
+    ctx.lineWidth = Math.max(1, R * 0.035);
+    ctx.beginPath();
+    ctx.moveTo(-0.3 * R, 0.45 * R);
+    ctx.lineTo(0.3 * R, 0.45 * R);
+    for (const x of [-0.2, -0.07, 0.07, 0.2]) {
+      ctx.moveTo(x * R, 0.38 * R);
+      ctx.lineTo(x * R, 0.52 * R);
+    }
+    ctx.stroke();
+    ctx.fillStyle = '#e0218a'; // adorno en la frente
+    FORMAS.corazon(ctx, 0.16 * R);
+  },
+
+  /** Flor de cempasúchil: muchos pétalos en capas. */
+  cempasuchil(ctx, s) {
+    const R = s / 2;
+    const base = ctx.fillStyle;
+    [[1, 14, 0.2], [0.72, 12, 0.17], [0.45, 10, 0.14]].forEach(([radio, petalos, tam], capa) => {
+      ctx.fillStyle = capa === 1 ? mezclarColor(base, '#000000', 0.12) : base;
+      for (let k = 0; k < petalos; k++) {
+        const a = (k * Math.PI * 2) / petalos + capa * 0.3;
+        ctx.beginPath();
+        ctx.arc(Math.cos(a) * radio * R * 0.7, Math.sin(a) * radio * R * 0.7, tam * R * 1.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    });
+    ctx.fillStyle = mezclarColor(base, '#000000', 0.3);
+    ctx.beginPath();
+    ctx.arc(0, 0, 0.15 * R, 0, Math.PI * 2);
+    ctx.fill();
+  },
+
+  /** Sombrero vaquero. */
+  sombrero(ctx, s) {
+    const R = s / 2;
+    ctx.beginPath(); // ala
+    ctx.moveTo(-R, 0.05 * R);
+    ctx.quadraticCurveTo(-0.95 * R, 0.4 * R, -0.5 * R, 0.38 * R);
+    ctx.quadraticCurveTo(0, 0.5 * R, 0.5 * R, 0.38 * R);
+    ctx.quadraticCurveTo(0.95 * R, 0.4 * R, R, 0.05 * R);
+    ctx.quadraticCurveTo(0.7 * R, 0.25 * R, 0, 0.22 * R);
+    ctx.quadraticCurveTo(-0.7 * R, 0.25 * R, -R, 0.05 * R);
+    ctx.fill();
+    ctx.beginPath(); // copa con la hendidura
+    ctx.moveTo(-0.48 * R, 0.25 * R);
+    ctx.bezierCurveTo(-0.55 * R, -0.3 * R, -0.45 * R, -0.62 * R, -0.2 * R, -0.55 * R);
+    ctx.quadraticCurveTo(0, -0.42 * R, 0.2 * R, -0.55 * R);
+    ctx.bezierCurveTo(0.45 * R, -0.62 * R, 0.55 * R, -0.3 * R, 0.48 * R, 0.25 * R);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; // cinta
+    ctx.fillRect(-0.5 * R, 0.02 * R, R, 0.12 * R);
+  },
+
+  herradura(ctx, s) {
+    const R = s / 2;
+    ctx.lineWidth = R * 0.3;
+    ctx.lineCap = 'butt';
+    ctx.beginPath();
+    ctx.arc(0, -0.05 * R, 0.62 * R, Math.PI * 0.85, Math.PI * 2.15, false);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    for (let k = 0; k < 6; k++) {
+      const a = Math.PI * 0.95 + (k * Math.PI * 1.1) / 5;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * 0.62 * R, -0.05 * R + Math.sin(a) * 0.62 * R, 0.05 * R, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+
+  /** Flor de hibisco (hawaiana). */
+  hibisco(ctx, s) {
+    const R = s / 2;
+    for (let k = 0; k < 5; k++) {
+      ctx.save();
+      ctx.rotate((k * Math.PI * 2) / 5);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.bezierCurveTo(-0.55 * R, -0.35 * R, -0.45 * R, -1.02 * R, 0, -0.95 * R);
+      ctx.bezierCurveTo(0.45 * R, -1.02 * R, 0.55 * R, -0.35 * R, 0, 0);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    ctx.beginPath();
+    ctx.arc(0, 0, 0.2 * R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#ffd166';
+    ctx.lineWidth = Math.max(1, R * 0.05);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0.45 * R, -0.5 * R);
+    ctx.stroke();
+    ctx.fillStyle = '#ffd166';
+    for (const [x, y] of [[0.45, -0.5], [0.38, -0.58], [0.52, -0.42]]) {
+      ctx.beginPath();
+      ctx.arc(x * R, y * R, 0.05 * R, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+
+  /** Guirnalda de banderines (papel picado, fiestas). Usa los colores de `colores` si se dan. */
+  banderines(ctx, s, colores) {
+    const R = s / 2;
+    const lista = colores?.length ? colores : [ctx.fillStyle, '#ffffff'];
+    const caida = 0.1 * R;
+    const y = (x) => caida * (1 - (x / R) ** 2); // la cuerda cuelga un poco en el centro
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+    ctx.lineWidth = Math.max(1, R * 0.01);
+    ctx.beginPath();
+    ctx.moveTo(-R, y(-R));
+    ctx.quadraticCurveTo(0, caida * 2, R, y(R));
+    ctx.stroke();
+    ctx.restore();
+    const n = 9;
+    const ancho = (2 * R) / n;
+    for (let i = 0; i < n; i++) {
+      const x0 = -R + i * ancho + ancho * 0.08;
+      const x1 = x0 + ancho * 0.84;
+      ctx.fillStyle = lista[i % lista.length];
+      ctx.beginPath();
+      ctx.moveTo(x0, y(x0));
+      ctx.lineTo(x1, y(x1));
+      ctx.lineTo((x0 + x1) / 2, (y(x0) + y(x1)) / 2 + ancho * 1.1);
+      ctx.closePath();
+      ctx.fill();
+    }
+  },
+
+  rayo(ctx, s) {
+    const R = s / 2;
+    ctx.beginPath();
+    ctx.moveTo(0.15 * R, -R);
+    ctx.lineTo(-0.5 * R, 0.1 * R);
+    ctx.lineTo(-0.02 * R, 0.1 * R);
+    ctx.lineTo(-0.2 * R, R);
+    ctx.lineTo(0.5 * R, -0.15 * R);
+    ctx.lineTo(0.05 * R, -0.15 * R);
+    ctx.closePath();
+    ctx.fill();
+  },
+
+  /** Nota musical (♫). */
+  nota(ctx, s) {
+    const R = s / 2;
+    for (const x of [-0.45, 0.4]) {
+      ctx.beginPath();
+      ctx.ellipse(x * R, 0.6 * R, 0.24 * R, 0.17 * R, -0.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(x * R + 0.16 * R, -0.75 * R, 0.08 * R, 1.35 * R);
+    }
+    ctx.beginPath();
+    ctx.moveTo(-0.29 * R, -0.75 * R);
+    ctx.lineTo(0.64 * R, -0.95 * R);
+    ctx.lineTo(0.64 * R, -0.72 * R);
+    ctx.lineTo(-0.29 * R, -0.52 * R);
+    ctx.closePath();
+    ctx.fill();
+  },
+
+  hexagono(ctx, s) {
+    const R = s / 2;
+    ctx.lineWidth = Math.max(1, s * 0.06);
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = Math.PI / 6 + (i * Math.PI) / 3;
+      ctx.lineTo(Math.cos(a) * R, Math.sin(a) * R);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  },
 };
 
 export const NOMBRES_FORMAS = Object.keys(FORMAS);
 
 /** Dibuja una figura en (x, y) de tamaño `s`. */
-export function dibujarForma(ctx, forma, x, y, s, { color = '#ffffff', rot = 0, alpha = 1, brillo = 0 } = {}) {
+export function dibujarForma(ctx, forma, x, y, s, { color = '#ffffff', colores = null, rot = 0, alpha = 1, brillo = 0 } = {}) {
   const dibujar = FORMAS[forma];
   if (!dibujar || !(s > 0)) return;
   ctx.save();
@@ -901,7 +1912,7 @@ export function dibujarForma(ctx, forma, x, y, s, { color = '#ffffff', rot = 0, 
     ctx.shadowColor = color;
     ctx.shadowBlur = brillo;
   }
-  dibujar(ctx, s);
+  dibujar(ctx, s, colores);
   ctx.restore();
 }
 
@@ -1035,8 +2046,11 @@ export function dibujarEsquinas(ctx, w, h, tema, paleta, encima) {
   const azar = aleatorio(numeroDe(tema.id));
   for (const e of tema.esquinas || []) {
     if (Boolean(e.encima) !== encima) continue;
-    dibujarForma(ctx, e.forma, e.x * w, e.y * h, e.tam * base, {
+    // los banderines cuelgan de lado a lado, sin importar si es tira o postal
+    const tam = e.anchoCompleto ? w * e.tam : e.tam * base;
+    dibujarForma(ctx, e.forma, e.x * w, e.y * h, tam, {
       color: colorDe(e.color, paleta, azar),
+      colores: e.colores?.map((c) => colorDe(c, paleta, azar)),
       rot: e.rot || 0,
       alpha: e.alpha ?? 1,
     });

@@ -68,6 +68,26 @@ export class EditorStickers {
     this.lienzo.getContext('2d').drawImage(imagen, 0, 0);
 
     this.paleta.replaceChildren();
+    // frase propia: el invitado escribe lo que quiera ("¡Feliz cumple, Ana!")
+    const propia = document.createElement('form');
+    propia.className = 'frase-propia';
+    const campo = document.createElement('input');
+    Object.assign(campo, { type: 'text', maxLength: 32, placeholder: '✏️ Escribe tu frase', autocomplete: 'off', enterKeyHint: 'done' });
+    campo.setAttribute('aria-label', 'Escribe tu propia frase');
+    const agregar = document.createElement('button');
+    agregar.type = 'submit';
+    agregar.textContent = '＋';
+    agregar.setAttribute('aria-label', 'Agregar mi frase');
+    propia.append(campo, agregar);
+    propia.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const texto = campo.value.trim();
+      if (!texto) return campo.focus();
+      this.agregar('frase', texto);
+      campo.value = '';
+      campo.blur(); // cierra el teclado del celular para ver dónde quedó
+    });
+    this.paleta.appendChild(propia);
     for (const frase of frases.filter(Boolean)) {
       const b = document.createElement('button');
       b.className = 'frase';

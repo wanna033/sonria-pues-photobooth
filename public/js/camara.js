@@ -50,6 +50,8 @@ export class Camara {
     this.lienzosCroma = new Map(); // un lienzo de trabajo por tamaño (vista previa y fotos)
     this.stream = null;
     this.demo = false;
+    /** Zoom digital (1 = sin zoom): las fotos se recortan al centro. */
+    this.zoom = 1;
     this.animacionDemo = 0;
     // video oculto pero en el documento, siempre reproduciendo: es la fuente de las capturas
     this.fuente = document.createElement('video');
@@ -90,6 +92,28 @@ export class Camara {
   /** Nombre de la cámara que se está usando. */
   get nombre() {
     return this.demo ? 'Cámara de demostración' : (this.stream?.getVideoTracks()[0]?.label || 'Cámara');
+  }
+
+  /** Pista de video activa (la cámara física, si existe). */
+  get pistaVideo() {
+    return this.demo ? null : this.stream?.getVideoTracks()[0] || null;
+  }
+
+  /** ¿La cámara ofrece una linterna controlable desde el navegador? */
+  get tieneAntorcha() {
+    try { return Boolean(this.pistaVideo?.getCapabilities?.().torch); } catch { return false; }
+  }
+
+  /** Enciende o apaga la linterna de la cámara trasera. Devuelve si pudo hacerlo. */
+  async usarAntorcha(activa) {
+    const pista = this.pistaVideo;
+    if (!pista || !this.tieneAntorcha) return false;
+    try {
+      await pista.applyConstraints({ advanced: [{ torch: Boolean(activa) }] });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -194,7 +218,7 @@ export class Camara {
       }
       const sw = this.ancho;
       const sh = this.alto;
-      const escala = Math.min(sw / w, sh / h);
+      const escala = Math.min(sw / w, sh / h) / (this.zoom || 1); // zoom digital: recorta al centro
       const cw = w * escala;
       const ch = h * escala;
       ctx.drawImage(this.fuente, (sw - cw) / 2, (sh - ch) / 2, cw, ch, 0, 0, w, h);
@@ -231,7 +255,7 @@ export class Camara {
     }
     const sw = this.ancho;
     const sh = this.alto;
-    const escala = Math.min(sw / w, sh / h);
+    const escala = Math.min(sw / w, sh / h) / (this.zoom || 1); // zoom digital: recorta al centro
     t.drawImage(this.fuente, (sw - w * escala) / 2, (sh - h * escala) / 2, w * escala, h * escala, 0, 0, w, h);
     t.restore();
     const cuadro = t.getImageData(0, 0, w, h);
@@ -268,6 +292,7 @@ export class Camara {
   detener() {
     cancelAnimationFrame(this.animacionDemo);
     clearInterval(this.animacionDemo);
+    this.usarAntorcha(false);
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
   }

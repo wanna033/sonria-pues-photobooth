@@ -6,11 +6,11 @@
  */
 
 import { Camara } from './camara.js';
-import { FILTROS, filtroPorId, dibujarConFiltro } from './filtros.js';
+import { FILTROS, filtroPorId, cssConIntensidad, dibujarConFiltro } from './filtros.js';
 import {
   PLANTILLAS, plantillaPorId, buscarPlantilla, registrarPersonalizadas, componer, cargarImagen, fotoDeMuestra,
   dibujarMarcaDeAgua, dibujarCubriendo, dibujarStickers, tamanoDePlantilla, tamanoImpresion, todasLasPlantillas,
-  plantillaTema, temaDePlantilla, configConColores,
+  plantillaTema, temaDePlantilla, configConColores, formatosDeTema,
 } from './plantillas.js';
 import { FORMATOS_TEMA, paletaDesdeColor, mezclarColor } from './temas.js';
 import { crearGifEnSegundoPlano } from './gif.js';
@@ -21,6 +21,8 @@ import { Ajustes } from './ajustes.js';
 import { configurarTextos, pintarTextosFijos, t } from './textos.js';
 import { nubeActiva, subirSesion as subirSesionANube, probarNube } from './nube.js';
 import { detectarModoWeb, apiWeb } from './web.js';
+import { DetectorAplauso } from './aplauso.js';
+import { listarRecuerdos, guardarRecuerdo, borrarRecuerdo } from './recuerdos.js';
 
 const $ = (selector) => document.querySelector(selector);
 const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -43,6 +45,12 @@ const estado = {
   modo: 'foto',
   plantilla: null,
   filtro: 'normal',
+  filtroIntensidad: 1,
+  flashSesion: true,
+  temporizadorSesion: 5,
+  zoom: 1, // zoom digital de la cámara (1x, 1.5x, 2x, 3x)
+  cuadricula: false, // guía de encuadre (tercios) sobre la cámara
+  aplauso: false, // disparo manos libres con un aplauso
   fotos: [],
   vistas: [],
   compuesto: null,
@@ -146,7 +154,7 @@ function paraCelular(p) {
 }
 
 const filtrosHabilitados = () => FILTROS.filter((f) => estado.config.filtros.habilitados.includes(f.id));
-const filtroCss = () => filtroPorId(estado.filtro).css;
+const filtroCss = () => cssConIntensidad(filtroPorId(estado.filtro).css, estado.filtroIntensidad);
 
 /** Con la cámara trasera del celular nada va en espejo (igual que la cámara del teléfono). */
 const camaraTrasera = () => MODO_WEB && camara.lado === 'environment';
@@ -524,10 +532,22 @@ function vistaSencilla(p) {
 
 const categoriaDe = (p) => (p.personalizada ? t('categoriaMisDisenos') : p.categoria || t('categoriaClasicas'));
 
+const CLAVE_FAVORITOS = 'sonria-pues-plantillas-favoritas';
+const normalizarBusqueda = (texto) => String(texto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+const leerFavoritos = () => {
+  try { return new Set(JSON.parse(localStorage.getItem(CLAVE_FAVORITOS) || '[]')); } catch { return new Set(); }
+};
+const guardarFavoritos = (favoritos) => {
+  try { localStorage.setItem(CLAVE_FAVORITOS, JSON.stringify([...favoritos])); } catch { /* almacenamiento no disponible */ }
+};
+
 function mostrarPlantillas(plantillas) {
   const contenedor = $('#opciones-plantilla');
   const muestras = [0, 1, 2, 3].map(fotoDeMuestra);
   const vertical = innerHeight > innerWidth;
+  const favoritos = leerFavoritos();
+  let categoriaActiva = '';
+  let soloFavoritos = false;
 
   const acomodar = (cantidad) => {
     const columnas = vertical ? 2 : (cantidad <= 4 ? cantidad : Math.min(5, Math.ceil(cantidad / 2)));
@@ -537,17 +557,49 @@ function mostrarPlantillas(plantillas) {
   };
 
   const tarjetas = plantillas.map((p, i) => {
-    const b = document.createElement('button');
+    const b = document.createElement('div');
     b.className = 'tarjeta-plantilla';
+    b.role = 'button';
+    b.tabIndex = 0;
     b.style.animationDelay = `${Math.min(i, 12) * 0.04}s`;
     b.dataset.categoria = categoriaDe(p);
+    b.dataset.busqueda = normalizarBusqueda(`${p.nombre} ${p.descripcion} ${b.dataset.categoria}`);
     const lienzo = document.createElement('canvas');
     const nombre = document.createElement('strong');
     nombre.textContent = p.icono ? `${p.icono} ${p.nombre}` : p.nombre;
     const detalle = document.createElement('span');
     detalle.textContent = p.descripcion;
-    b.append(lienzo, nombre, detalle);
+    const favorito = document.createElement('span');
+    favorito.className = 'favorito-plantilla';
+    favorito.role = 'button';
+    favorito.tabIndex = 0;
+    const pintarFavorito = () => {
+      const activo = favoritos.has(p.id);
+      favorito.textContent = activo ? '★' : '☆';
+      favorito.classList.toggle('activo', activo);
+      favorito.setAttribute('aria-label', activo ? `Quitar ${p.nombre} de favoritos` : `Guardar ${p.nombre} en favoritos`);
+    };
+    const alternarFavorito = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (favoritos.has(p.id)) favoritos.delete(p.id); else favoritos.add(p.id);
+      guardarFavoritos(favoritos);
+      pintarFavorito();
+      aplicarFiltros();
+    };
+    favorito.addEventListener('click', alternarFavorito);
+    favorito.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') alternarFavorito(e);
+    });
+    pintarFavorito();
+    b.append(lienzo, nombre, detalle, favorito);
     b.addEventListener('click', () => elegirPlantilla(p));
+    b.addEventListener('keydown', (e) => {
+      if ((e.key === 'Enter' || e.key === ' ') && e.target === b) {
+        e.preventDefault();
+        elegirPlantilla(p);
+      }
+    });
     return { b, p, lienzo };
   });
   contenedor.replaceChildren(...tarjetas.map((x) => x.b));
@@ -558,19 +610,28 @@ function mostrarPlantillas(plantillas) {
   const categorias = [...new Set(tarjetas.map((x) => x.b.dataset.categoria))];
   const barra = $('#categorias-plantilla');
   barra.hidden = categorias.length < 2;
-  const filtrar = (categoria) => {
+  const aplicarFiltros = () => {
+    const consulta = normalizarBusqueda($('#buscar-plantilla').value);
     let visibles = 0;
-    for (const { b } of tarjetas) {
-      b.hidden = Boolean(categoria) && b.dataset.categoria !== categoria;
+    for (const { b, p } of tarjetas) {
+      const coincideCategoria = !categoriaActiva || b.dataset.categoria === categoriaActiva;
+      const coincideBusqueda = !consulta || b.dataset.busqueda.includes(consulta);
+      const coincideFavorito = !soloFavoritos || favoritos.has(p.id);
+      b.hidden = !(coincideCategoria && coincideBusqueda && coincideFavorito);
       if (!b.hidden) visibles++;
     }
     acomodar(visibles);
     contenedor.scrollTop = 0;
+    $('#plantillas-sin-resultados').hidden = visibles > 0;
     barra.querySelectorAll('button').forEach((c) => {
-      const activa = c.dataset.categoria === (categoria || '');
+      const activa = c.dataset.categoria === categoriaActiva;
       c.classList.toggle('elegida', activa);
       if (activa) c.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     });
+  };
+  const filtrar = (categoria) => {
+    categoriaActiva = categoria;
+    aplicarFiltros();
   };
   const chip = (texto, categoria, icono = '') => {
     const c = document.createElement('button');
@@ -582,6 +643,21 @@ function mostrarPlantillas(plantillas) {
   };
   const iconoDe = (categoria) => tarjetas.find((x) => x.b.dataset.categoria === categoria)?.p.icono || '';
   barra.replaceChildren(chip(t('plantillaTodas'), ''), ...categorias.map((c) => chip(c, c, iconoDe(c))));
+  const buscador = $('#buscar-plantilla');
+  buscador.value = '';
+  buscador.oninput = aplicarFiltros;
+  const botonFavoritos = $('#btn-solo-favoritos');
+  const pintarSoloFavoritos = () => {
+    botonFavoritos.classList.toggle('elegido', soloFavoritos);
+    botonFavoritos.setAttribute('aria-pressed', String(soloFavoritos));
+    botonFavoritos.firstChild.textContent = soloFavoritos ? '★ ' : '☆ ';
+  };
+  botonFavoritos.onclick = () => {
+    soloFavoritos = !soloFavoritos;
+    pintarSoloFavoritos();
+    aplicarFiltros();
+  };
+  pintarSoloFavoritos();
   filtrar('');
   ir('plantilla');
 
@@ -654,8 +730,8 @@ function mostrarPersonalizar() {
 
   // formato: el mismo tema acomodado de otra forma (tira, una foto, cuadrícula…)
   const formatos = tema
-    ? Object.entries(FORMATOS_TEMA).map(([id, f]) => ({
-      id, nombre: f.nombre, fotos: f.fotos, plantilla: paraCelular(plantillaTema(tema, id)),
+    ? formatosDeTema(tema).map((id) => ({
+      id, nombre: FORMATOS_TEMA[id].nombre, fotos: FORMATOS_TEMA[id].fotos, plantilla: paraCelular(plantillaTema(tema, id)),
     }))
     : plantillasHabilitadas().filter((b) => !b.tema && !b.personalizada)
       .map((b) => ({ id: b.id, nombre: b.nombre, fotos: b.fotos, plantilla: b }));
@@ -811,7 +887,11 @@ function mostrarVistaCroma(video) {
   lienzo.height = h;
   lienzo.hidden = false;
   const ctx = lienzo.getContext('2d');
-  const pintar = () => camara.dibujar(ctx, w, h, { filtroCss: filtroCss(), espejo: espejoVista() });
+  // El filtro se aplica por CSS para poder cambiar intensidad y comparar antes/después
+  // sin volver a procesar todos los píxeles de la pantalla verde.
+  const pintar = () => camara.dibujar(ctx, w, h, { espejo: espejoVista() });
+  lienzo.style.filter = filtroCss();
+  lienzo.style.scale = String(estado.zoom);
   pintar();
   vistaCroma.reloj = setInterval(pintar, 1000 / 24);
   vistaCroma.lienzo = lienzo;
@@ -831,6 +911,12 @@ function pasoFiltro() {
   const sugerido = estado.modo === 'foto' ? temaDePlantilla(estado.plantilla)?.filtro : '';
   const preferido = filtros.some((f) => f.id === sugerido) ? sugerido : estado.config.filtros.porDefecto;
   estado.filtro = filtros.some((f) => f.id === preferido) ? preferido : (filtros[0]?.id || 'normal');
+  estado.filtroIntensidad = 1;
+  estado.flashSesion = estado.config.captura.flash !== false;
+  estado.temporizadorSesion = Number(estado.config.captura.cuentaPrimera) || 5;
+  estado.zoom = 1;
+  aplicarZoom();
+  actualizarControlesCaptura();
   // en el celular esta pantalla también sirve para cambiar entre la cámara frontal y la
   // trasera, y para usar fotos que ya están en el teléfono
   const conSelector = estado.config.filtros.mostrarSelector && filtros.length > 1;
@@ -844,12 +930,13 @@ function pasoFiltro() {
   mostrarVistaCroma(principal);
 
   // miniaturas: un cuadro chico de la cámara copiado en cada una, con su filtro por CSS.
-  // Con 18 filtros es mucho más ligero que 18 videos en vivo (celulares sencillos).
+  // Es mucho más ligero que mantener un video por filtro en celulares sencillos.
   const contenedor = $('#opciones-filtro');
   let elegida = null;
-  contenedor.replaceChildren(...filtros.map((f) => {
+  const tarjetas = filtros.map((f) => {
     const b = document.createElement('button');
     b.className = 'tarjeta-filtro';
+    b.dataset.categoria = f.categoria || 'Otros';
     b.classList.toggle('elegida', f.id === estado.filtro);
     if (f.id === estado.filtro) elegida = b;
     const lienzo = document.createElement('canvas');
@@ -861,17 +948,112 @@ function pasoFiltro() {
     b.append(lienzo, nombre);
     b.addEventListener('click', () => {
       estado.filtro = f.id;
-      principal.style.filter = f.css;
+      actualizarFiltroVisible();
       contenedor.querySelectorAll('.tarjeta-filtro').forEach((x) => x.classList.toggle('elegida', x === b));
     });
+    return { b, f };
+  });
+  contenedor.replaceChildren(...tarjetas.map(({ b }) => b));
+
+  // Categorías para encontrar rápido el estilo deseado cuando hay muchos filtros.
+  const categorias = [...new Set(tarjetas.map(({ b }) => b.dataset.categoria))];
+  const barraCategorias = $('#categorias-filtro');
+  let categoriaActiva = '';
+  const aplicarCategoria = () => {
+    for (const { b } of tarjetas) b.hidden = Boolean(categoriaActiva) && b.dataset.categoria !== categoriaActiva;
+    barraCategorias.querySelectorAll('button').forEach((b) => b.classList.toggle('elegida', b.dataset.categoria === categoriaActiva));
+    contenedor.scrollTop = 0;
+  };
+  const chipCategoria = (nombre, valor) => {
+    const b = document.createElement('button');
+    b.className = 'chip';
+    b.dataset.categoria = valor;
+    b.textContent = nombre;
+    b.addEventListener('click', () => { categoriaActiva = valor; aplicarCategoria(); });
     return b;
-  }));
+  };
+  barraCategorias.replaceChildren(chipCategoria('Todos', ''), ...categorias.map((c) => chipCategoria(c, c)));
+  barraCategorias.hidden = categorias.length < 2;
+  aplicarCategoria();
+
+  const intensidad = $('#intensidad-filtro');
+  intensidad.value = '100';
+  $('#valor-intensidad').value = '100%';
+  $('#control-intensidad').hidden = filtros.length < 2;
   refrescarMiniaturasFiltro();
   clearInterval(relojMiniaturasFiltro);
   relojMiniaturasFiltro = setInterval(refrescarMiniaturasFiltro, 120);
   ir('filtro');
   contenedor.scrollTop = 0;
   elegida?.scrollIntoView({ block: 'nearest' }); // el filtro sugerido por el tema, a la vista
+  escucharAplauso();
+}
+
+function actualizarFiltroVisible() {
+  const css = filtroCss();
+  $('#video-filtro').style.filter = css;
+  if (vistaCroma.lienzo) vistaCroma.lienzo.style.filter = css;
+}
+
+function compararFiltro(mostrarNatural) {
+  const principal = $('#video-filtro');
+  const croma = vistaCroma.lienzo;
+  principal.style.filter = mostrarNatural ? 'none' : filtroCss();
+  if (croma) croma.style.filter = mostrarNatural ? 'none' : filtroCss();
+  $('#etiqueta-comparacion').hidden = !mostrarNatural;
+  $('#btn-comparar-filtro').classList.toggle('presionado', mostrarNatural);
+}
+
+function actualizarControlesCaptura() {
+  const botonFlash = $('#btn-flash-rapido');
+  const activo = Boolean(estado.flashSesion);
+  botonFlash.classList.toggle('activo', activo);
+  botonFlash.setAttribute('aria-pressed', String(activo));
+  botonFlash.setAttribute('aria-label', activo ? 'Flash activado; toca para apagar' : 'Flash apagado; toca para activar');
+  botonFlash.querySelector('.control-pro-texto').textContent = activo ? 'Flash ON' : 'Flash OFF';
+  $('#temporizador-rapido-valor').textContent = `${estado.temporizadorSesion} s`;
+  $('#zoom-rapido-valor').textContent = `${estado.zoom}x`;
+  $('#btn-zoom-rapido').classList.toggle('activo', estado.zoom > 1);
+  $('#btn-cuadricula').classList.toggle('activo', estado.cuadricula);
+  $('#btn-cuadricula').setAttribute('aria-pressed', String(estado.cuadricula));
+  $('#btn-aplauso').classList.toggle('activo', estado.aplauso);
+  $('#btn-aplauso').setAttribute('aria-pressed', String(estado.aplauso));
+  document.body.classList.toggle('con-cuadricula', estado.cuadricula);
+}
+
+/** Zoom digital: la foto se recorta al centro y la vista previa se agranda igual. */
+function aplicarZoom() {
+  camara.zoom = estado.zoom;
+  for (const el of [$('#video-filtro'), $('#video-principal'), vistaCroma.lienzo]) {
+    if (el) el.style.scale = String(estado.zoom);
+  }
+}
+
+const detectorAplauso = new DetectorAplauso();
+
+/** Con "Aplauso" activo, la sesión empieza sola al oír un aplauso (o un grito). */
+async function escucharAplauso() {
+  const aviso = $('#aviso-aplauso');
+  if (!estado.aplauso || estado.pantalla !== 'filtro') {
+    detectorAplauso.detener();
+    aviso.hidden = true;
+    return;
+  }
+  try {
+    await detectorAplauso.iniciar(() => {
+      if (estado.pantalla !== 'filtro') return;
+      detectorAplauso.detener();
+      aviso.hidden = true;
+      iniciarCaptura();
+    });
+    aviso.hidden = false;
+  } catch (err) {
+    console.error('Sin micrófono para el aplauso', err);
+    estado.aplauso = false;
+    actualizarControlesCaptura();
+    aviso.hidden = true;
+    aviso(t('avisoMicrofono'), 6000);
+  }
 }
 
 const MINIATURA_FILTRO = { w: 192, h: 144 };
@@ -890,6 +1072,8 @@ function refrescarMiniaturasFiltro() {
 
 function soltarVideosFiltro() {
   clearInterval(relojMiniaturasFiltro);
+  detectorAplauso.detener();
+  $('#aviso-aplauso').hidden = true;
 }
 
 // ================================================================ captura
@@ -952,10 +1136,29 @@ async function cuentaRegresiva(segundos, token) {
   caja.replaceChildren();
 }
 
-function destello() {
-  obturador();
-  if (!estado.config.captura.flash) return;
+async function prepararDestello(token) {
+  if (!estado.flashSesion) return;
   const flash = $('#flash');
+  const antorcha = await camara.usarAntorcha(true);
+  flash.classList.remove('disparo');
+  flash.classList.toggle('preparando', !antorcha);
+  // La pantalla blanca ilumina el rostro en la cámara frontal; la linterna
+  // física necesita un instante para estabilizarse en la cámara trasera.
+  try {
+    await pausa(antorcha ? 220 : 320, token);
+  } catch (err) {
+    flash.classList.remove('preparando');
+    camara.usarAntorcha(false);
+    throw err;
+  }
+}
+
+function terminarDestello() {
+  obturador();
+  camara.usarAntorcha(false);
+  if (!estado.flashSesion) return;
+  const flash = $('#flash');
+  flash.classList.remove('preparando');
   flash.classList.remove('disparo');
   void flash.offsetWidth; // reinicia la animación
   flash.classList.add('disparo');
@@ -980,14 +1183,18 @@ async function capturarFotos(indices, total, token) {
       mensaje('');
     }
     mostrarPose(sugerenciaDePose());
-    await cuentaRegresiva(k === 0 ? captura.cuentaPrimera : captura.cuentaRegresiva, token);
+    // el temporizador elegido es para la primera; las siguientes siguen el ritmo de la cabina
+    // (sin pasarse del temporizador, para que 3 s no se vuelvan más lentos)
+    const segundos = k === 0 ? estado.temporizadorSesion : Math.min(captura.cuentaRegresiva, estado.temporizadorSesion);
+    await cuentaRegresiva(segundos, token);
     mostrarPose('');
     mensaje(t('capturaSonrian'));
     hablar(t('vozSonrian'));
     await pausa(350, token);
 
+    await prepararDestello(token);
     const foto = camara.capturar({ filtroCss: filtroCss(), espejo: espejoFotos() });
-    destello();
+    terminarDestello();
     mensaje('');
     estado.fotos[i] = foto;
     estado.vistas[i] = urlDe(await lienzoABlob(reducir(foto, 640), 'image/jpeg', 0.8));
@@ -1103,7 +1310,7 @@ async function capturarBoomerang(token) {
   hablar(t('vozBoomerang'));
   await pausa(1800, token);
   mensaje('');
-  await cuentaRegresiva(captura.cuentaPrimera, token);
+  await cuentaRegresiva(estado.temporizadorSesion, token);
 
   const w = Number(boomerang.ancho) || 640;
   const h = Math.round((w * camara.alto) / camara.ancho / 2) * 2;
@@ -1172,7 +1379,7 @@ async function capturarVideo(token) {
   hablar(t('vozVideo'));
   await pausa(1800, token);
   mensaje('');
-  await cuentaRegresiva(captura.cuentaPrimera, token);
+  await cuentaRegresiva(estado.temporizadorSesion, token);
 
   const w = Math.min(1280, camara.ancho);
   const h = Math.round((w * camara.alto) / camara.ancho / 2) * 2;
@@ -1564,6 +1771,106 @@ function mostrarFinal() {
   }
 }
 
+/** Empieza otra captura sin volver a elegir modo, plantilla, colores ni filtro. */
+function otraConMismoEstilo() {
+  estado.token++;
+  estado.detenerVideo?.();
+  // liberarSesion borra lo personalizado en la cabina; aquí se conserva a propósito
+  const { personal, datosInvitado } = estado;
+  estado.personal = { ...personal, logoUrl: '' }; // la URL del logo no se libera
+  liberarSesion();
+  Object.assign(estado, { personal, datosInvitado }); // es el mismo invitado
+  estado.historial = [];
+  $('#final-resultado').replaceChildren();
+  $('#area-impresion').replaceChildren();
+  iniciarCaptura();
+}
+
+// ================================================================ Mis fotos (celular)
+
+async function pintarBotonMisFotos() {
+  const boton = $('#btn-mis-fotos');
+  if (!MODO_WEB) {
+    boton.hidden = true;
+    return;
+  }
+  const cantidad = (await listarRecuerdos()).length;
+  boton.hidden = cantidad === 0;
+  $('#mis-fotos-cantidad').textContent = cantidad ? `(${cantidad})` : '';
+}
+
+const misFotos = { urls: [], actual: null };
+
+function soltarUrlsMisFotos() {
+  misFotos.urls.forEach((u) => URL.revokeObjectURL(u));
+  misFotos.urls = [];
+}
+
+function medioDe(recuerdo, conControles = false) {
+  const url = URL.createObjectURL(recuerdo.blob);
+  misFotos.urls.push(url);
+  if (recuerdo.tipo.startsWith('video/')) {
+    const v = document.createElement('video');
+    Object.assign(v, { src: url, muted: true, loop: true, playsInline: true, autoplay: true, controls: conControles });
+    return v;
+  }
+  const img = document.createElement('img');
+  img.src = url;
+  img.alt = recuerdo.nombre;
+  return img;
+}
+
+async function abrirMisFotos() {
+  soltarUrlsMisFotos();
+  const recuerdos = await listarRecuerdos();
+  const cuadricula = $('#mis-fotos-cuadricula');
+  cuadricula.replaceChildren(...recuerdos.map((r) => {
+    const b = document.createElement('button');
+    b.className = 'mis-fotos-miniatura';
+    b.append(medioDe(r));
+    b.addEventListener('click', () => verRecuerdo(r));
+    return b;
+  }));
+  $('#mis-fotos-visor').hidden = true;
+  cuadricula.hidden = false;
+  $('#mis-fotos').hidden = false;
+}
+
+function cerrarMisFotos() {
+  $('#mis-fotos').hidden = true;
+  $('#mis-fotos-medio').replaceChildren();
+  $('#mis-fotos-cuadricula').replaceChildren();
+  soltarUrlsMisFotos();
+  pintarBotonMisFotos();
+}
+
+function verRecuerdo(recuerdo) {
+  misFotos.actual = recuerdo;
+  $('#mis-fotos-medio').replaceChildren(medioDe(recuerdo, true));
+  $('#mis-fotos-cuadricula').hidden = true;
+  $('#mis-fotos-visor').hidden = false;
+  const archivo = new File([recuerdo.blob], recuerdo.nombre, { type: recuerdo.tipo });
+  const compartible = Boolean(navigator.canShare?.({ files: [archivo] }));
+  $('#btn-mis-fotos-compartir').hidden = !compartible;
+  const compartir = async () => {
+    try {
+      await navigator.share({ files: [archivo], title: estado.config.marca.nombre });
+    } catch (err) {
+      if (err.name !== 'AbortError') aviso('No se pudo compartir. Mantén presionada la foto para guardarla.', 6000);
+    }
+  };
+  $('#btn-mis-fotos-compartir').onclick = compartir;
+  $('#btn-mis-fotos-guardar').onclick = () => {
+    // en iPhone "Guardar imagen" está en el menú de compartir
+    if (esIOS() && compartible) return compartir();
+    const a = document.createElement('a');
+    a.href = misFotos.urls.at(-1);
+    a.download = recuerdo.nombre;
+    a.click();
+    aviso(t('avisoGuardado'), 5000);
+  };
+}
+
 const EXTENSIONES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'video/mp4': 'mp4', 'video/webm': 'webm' };
 
 /** iPhone y iPad (los iPad nuevos dicen ser una Mac, pero tienen pantalla táctil). */
@@ -1594,12 +1901,19 @@ async function prepararGuardado(resultado) {
     const nombre = `${marcaEnArchivo}-${Date.now()}.${EXTENSIONES[tipo] || 'jpg'}`;
     enlace.download = nombre;
     archivo = new File([blob], nombre, { type: tipo });
+    // queda en "Mis fotos" del celular, por si no la guarda ahora
+    if (MODO_WEB) guardarRecuerdo(blob, nombre).then(pintarBotonMisFotos);
   } catch (err) {
     console.error('No se pudo preparar el archivo para guardar', err);
   }
 
   const compartible = Boolean(archivo && navigator.canShare?.({ files: [archivo] }));
   botonCompartir.hidden = !compartible;
+
+  // imprimir en casa desde el celular (AirPrint o la impresora del teléfono), al tamaño del diseño
+  const botonImprimir = $('#btn-imprimir-celular');
+  botonImprimir.hidden = !resultado.tamano;
+  botonImprimir.onclick = () => imprimirImagen(resultado.url, resultado.tamano, 1);
   const compartir = async () => {
     try {
       await navigator.share({ files: [archivo], title: estado.config.marca.nombre });
@@ -1926,6 +2240,66 @@ function conectarEventos() {
   }));
 
   $('#btn-filtro-listo').addEventListener('click', iniciarCaptura);
+  $('#btn-flash-rapido').addEventListener('click', () => {
+    estado.flashSesion = !estado.flashSesion;
+    if (!estado.flashSesion) camara.usarAntorcha(false);
+    actualizarControlesCaptura();
+  });
+  $('#btn-zoom-rapido').addEventListener('click', () => {
+    const opciones = [1, 1.5, 2, 3];
+    estado.zoom = opciones[(opciones.indexOf(estado.zoom) + 1) % opciones.length];
+    aplicarZoom();
+    actualizarControlesCaptura();
+  });
+  $('#btn-cuadricula').addEventListener('click', () => {
+    estado.cuadricula = !estado.cuadricula;
+    actualizarControlesCaptura();
+  });
+  $('#btn-aplauso').addEventListener('click', () => {
+    estado.aplauso = !estado.aplauso;
+    actualizarControlesCaptura();
+    escucharAplauso();
+  });
+
+  // Mis fotos (celular)
+  $('#btn-mis-fotos').addEventListener('click', abrirMisFotos);
+  $('#btn-mis-fotos-cerrar').addEventListener('click', cerrarMisFotos);
+  $('#btn-mis-fotos-volver').addEventListener('click', () => {
+    $('#mis-fotos-visor').hidden = true;
+    $('#mis-fotos-medio').replaceChildren();
+    $('#mis-fotos-cuadricula').hidden = false;
+  });
+  $('#btn-mis-fotos-borrar').addEventListener('click', async () => {
+    if (!misFotos.actual || !window.confirm(t('misFotosConfirmar'))) return;
+    await borrarRecuerdo(misFotos.actual.id);
+    misFotos.actual = null;
+    abrirMisFotos();
+  });
+
+  $('#btn-temporizador-rapido').addEventListener('click', () => {
+    const opciones = [3, 5, 10];
+    const actual = opciones.indexOf(estado.temporizadorSesion);
+    estado.temporizadorSesion = opciones[(actual + 1) % opciones.length];
+    actualizarControlesCaptura();
+  });
+  $('#intensidad-filtro').addEventListener('input', (e) => {
+    estado.filtroIntensidad = Number(e.target.value) / 100;
+    $('#valor-intensidad').value = `${e.target.value}%`;
+    actualizarFiltroVisible();
+  });
+  const botonComparar = $('#btn-comparar-filtro');
+  ['pointerdown', 'pointerenter'].forEach((evento) => botonComparar.addEventListener(evento, (e) => {
+    if (evento === 'pointerenter' && !e.buttons) return;
+    e.preventDefault();
+    compararFiltro(true);
+  }));
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach((evento) => botonComparar.addEventListener(evento, () => compararFiltro(false)));
+  botonComparar.addEventListener('keydown', (e) => {
+    if (e.key === ' ' || e.key === 'Enter') compararFiltro(true);
+  });
+  botonComparar.addEventListener('keyup', (e) => {
+    if (e.key === ' ' || e.key === 'Enter') compararFiltro(false);
+  });
   $('#btn-datos-continuar').addEventListener('click', enviarFormulario);
   $('#btn-datos-omitir').addEventListener('click', () => {
     estado.datosInvitado = null;
@@ -1947,6 +2321,7 @@ function conectarEventos() {
     actualizarCopias();
   });
   $('#btn-imprimir').addEventListener('click', imprimirSesion);
+  $('#btn-mismo-estilo').addEventListener('click', otraConMismoEstilo);
   $('#btn-terminar').addEventListener('click', reiniciar);
 
   // personalizar: texto, logo y seguir
@@ -2026,6 +2401,7 @@ async function arrancar() {
   document.body.classList.toggle('modo-web', MODO_WEB);
   document.body.classList.toggle('admin', new URLSearchParams(location.search).has('ajustes'));
   $('#btn-invitar').hidden = !MODO_WEB;
+  pintarBotonMisFotos();
   // celular: se guarda en el teléfono para que abra aunque no haya señal
   if (MODO_WEB && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   estado.config = await api('/api/config');

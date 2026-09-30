@@ -7,7 +7,7 @@
  * Sólo se registra en la versión web (en la cabina de la PC no hace falta).
  */
 
-const CACHE = 'sonria-pues-v2';
+const CACHE = 'sonria-pues-v5';
 const ESPERA_MS = 3500;
 
 const BASICOS = [
@@ -20,6 +20,8 @@ const BASICOS = [
   'marca/logo.png',
   'marca/logo-claro.png',
   'js/app.js',
+  'js/aplauso.js',
+  'js/recuerdos.js',
   'js/ajustes.js',
   'js/camara.js',
   'js/disenos.js',

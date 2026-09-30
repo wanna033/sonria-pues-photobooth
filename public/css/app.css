@@ -429,6 +429,53 @@ h1, h2, h3 { margin: 0; }
 
 /* ---------------------------------------------------------------- plantillas */
 
+.explorador-plantillas {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(100%, 760px);
+  margin: 0 auto 10px;
+  flex-shrink: 0;
+}
+.buscar-plantilla {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 2px solid var(--borde);
+  border-radius: 16px;
+  background: var(--superficie);
+  color: var(--texto-suave);
+}
+.buscar-plantilla:focus-within { border-color: var(--secundario); box-shadow: 0 0 0 3px color-mix(in srgb, var(--secundario) 18%, transparent); }
+.buscar-plantilla span { font-size: 27px; line-height: 1; transform: rotate(-20deg); }
+.buscar-plantilla input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--texto);
+  font: inherit;
+  font-size: 16px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.boton-favoritos {
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: 16px;
+  border: 2px solid var(--borde);
+  background: var(--superficie);
+  color: var(--texto);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.boton-favoritos.elegido { color: #8a6500; background: #fff3bf; border-color: #f2c94c; }
+.sin-resultados { margin: auto; padding: 28px; color: var(--texto-suave); font-size: 18px; text-align: center; }
+
 .opciones-plantilla {
   flex: 1;
   display: grid;
@@ -444,6 +491,7 @@ h1, h2, h3 { margin: 0; }
 }
 
 .tarjeta-plantilla {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -452,8 +500,12 @@ h1, h2, h3 { margin: 0; }
   border-radius: var(--radio);
   background: var(--superficie);
   border: 2px solid transparent;
+  color: var(--texto);
+  font: inherit;
+  cursor: pointer;
   animation: entrar 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
+.tarjeta-plantilla:focus-visible { outline: 3px solid var(--secundario); outline-offset: 2px; }
 .tarjeta-plantilla:active { transform: scale(0.97); }
 .tarjeta-plantilla canvas {
   width: 100%;
@@ -463,6 +515,24 @@ h1, h2, h3 { margin: 0; }
 }
 .tarjeta-plantilla strong { font-size: clamp(17px, 2.2vmin, 24px); }
 .tarjeta-plantilla span { color: var(--texto-suave); font-size: 15px; }
+.tarjeta-plantilla .favorito-plantilla {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: #6b5a20;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  font-size: 26px;
+  line-height: 1;
+  z-index: 2;
+}
+.tarjeta-plantilla .favorito-plantilla.activo { color: #b8860b; background: #fff4c7; }
+.favorito-plantilla:focus-visible { outline: 3px solid var(--secundario); outline-offset: 2px; }
 
 /* ---------------------------------------------------------------- filtros */
 
@@ -484,6 +554,10 @@ h1, h2, h3 { margin: 0; }
   min-height: 0;
 }
 .filtro-principal video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+.selector-filtros { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.categorias-filtro { flex-shrink: 0; margin-bottom: 8px; }
+.categorias-filtro .chip { min-height: 38px; padding: 0 13px; font-size: 14px; }
 
 .opciones-filtro {
   display: grid;
@@ -508,6 +582,71 @@ h1, h2, h3 { margin: 0; }
 .tarjeta-filtro video,
 .tarjeta-filtro canvas { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 11px; background: #000; }
 .tarjeta-filtro span { line-height: 1.15; }
+.tarjeta-filtro[hidden] { display: none; }
+
+.intensidad-filtro {
+  display: grid;
+  grid-template-columns: auto minmax(100px, 1fr) 52px;
+  align-items: center;
+  gap: 12px;
+  min-height: 54px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--borde);
+  border-radius: 16px;
+  background: var(--superficie);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.intensidad-filtro[hidden] { display: none; }
+.intensidad-filtro input { width: 100%; accent-color: var(--secundario); }
+.intensidad-filtro output { text-align: right; color: var(--texto-suave); font-variant-numeric: tabular-nums; }
+.boton-comparar {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 3;
+  min-height: 48px;
+  padding: 0 15px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.52);
+  backdrop-filter: blur(8px);
+  font-weight: 700;
+}
+.boton-comparar.presionado { background: #fff; color: #111; }
+.controles-captura-pro {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 4;
+  display: flex;
+  gap: 8px;
+}
+.controles-captura-pro button {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+  font-weight: 800;
+}
+.controles-captura-pro button.activo { color: #2c2100; background: #ffd84d; border-color: #ffe98c; }
+.etiqueta-comparacion {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 3;
+  padding: 8px 12px;
+  border-radius: 999px;
+  color: #111;
+  background: rgba(255, 255, 255, 0.9);
+  font-weight: 800;
+}
+.etiqueta-comparacion[hidden] { display: none; }
 
 /* ---------------------------------------------------------------- chips (categorías y formatos) */
 
@@ -769,6 +908,7 @@ h1, h2, h3 { margin: 0; }
   opacity: 0;
   pointer-events: none;
 }
+.flash.preparando { opacity: 0.94; }
 .flash.disparo { animation: flash 0.6s ease-out; }
 @keyframes flash { 0% { opacity: 1; } 100% { opacity: 0; } }
 
@@ -902,6 +1042,104 @@ h1, h2, h3 { margin: 0; }
   line-height: 1.1;
 }
 .stickers-paleta button:active { transform: scale(0.9); }
+/* frase propia: ocupa todo el ancho de la paleta */
+.frase-propia { grid-column: 1 / -1; display: flex; gap: 8px; }
+.frase-propia input {
+  flex: 1;
+  min-width: 0;
+  min-height: 52px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 2px solid var(--borde);
+  background: var(--superficie-fuerte);
+  color: var(--texto);
+  font: inherit;
+  font-size: 16px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.frase-propia input:focus { outline: none; border-color: var(--secundario); }
+.stickers-paleta .frase-propia button { aspect-ratio: auto; width: 56px; min-height: 52px; font-size: 26px; background: var(--degradado); color: #fff; }
+
+/* ---------------------------------------------------------------- controles rápidos extra */
+
+/* en columna, a la derecha de la cámara, para que quepan en el celular */
+.controles-captura-pro { flex-direction: column; align-items: flex-end; }
+.guia-encuadre {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  display: none;
+  background:
+    linear-gradient(to right, transparent calc(33.33% - 1px), rgba(255, 255, 255, 0.55) calc(33.33% - 1px), rgba(255, 255, 255, 0.55) calc(33.33% + 1px), transparent calc(33.33% + 1px), transparent calc(66.66% - 1px), rgba(255, 255, 255, 0.55) calc(66.66% - 1px), rgba(255, 255, 255, 0.55) calc(66.66% + 1px), transparent calc(66.66% + 1px)),
+    linear-gradient(to bottom, transparent calc(33.33% - 1px), rgba(255, 255, 255, 0.55) calc(33.33% - 1px), rgba(255, 255, 255, 0.55) calc(33.33% + 1px), transparent calc(33.33% + 1px), transparent calc(66.66% - 1px), rgba(255, 255, 255, 0.55) calc(66.66% - 1px), rgba(255, 255, 255, 0.55) calc(66.66% + 1px), transparent calc(66.66% + 1px));
+}
+body.con-cuadricula .guia-encuadre { display: block; }
+.pantalla-captura { overflow: hidden; } /* el zoom agranda el video: que no se salga */
+.aviso-aplauso {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  z-index: 3;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-weight: 700;
+  white-space: nowrap;
+  animation: pulso-aplauso 1.6s ease-in-out infinite;
+}
+.aviso-aplauso[hidden] { display: none; }
+@keyframes pulso-aplauso { 50% { opacity: 0.65; } }
+
+/* ---------------------------------------------------------------- Mis fotos (celular) */
+
+.boton-enlace .contador { opacity: 0.7; }
+.mis-fotos {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(6px);
+}
+.mis-fotos[hidden] { display: none; }
+.mis-fotos-caja {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(900px, 100%);
+  max-height: 100%;
+  padding: 16px;
+  border-radius: 24px;
+  background: var(--fondo);
+  box-shadow: var(--sombra);
+  overflow: hidden;
+}
+.mis-fotos-encabezado { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.mis-fotos-encabezado h2 { margin: 0; font-family: var(--fuente-titulo); }
+.mis-fotos-cuadricula {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.mis-fotos-cuadricula[hidden] { display: none; }
+.mis-fotos-miniatura { aspect-ratio: 1; padding: 0; border-radius: 12px; overflow: hidden; background: #000; }
+.mis-fotos-miniatura img, .mis-fotos-miniatura video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mis-fotos-visor { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.mis-fotos-visor[hidden] { display: none; }
+.mis-fotos-medio { min-height: 0; display: grid; place-items: center; }
+.mis-fotos-medio img, .mis-fotos-medio video { max-width: 100%; max-height: 55vh; border-radius: 10px; box-shadow: var(--sombra); }
+.mis-fotos-acciones { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.mis-fotos-acciones > * { flex: 1 1 140px; }
+.mis-fotos-acciones .boton-gigante { flex-basis: 100%; min-height: 60px; padding: 0 16px; font-size: 20px; }
 
 .stickers-herramientas {
   display: grid;
@@ -1001,6 +1239,7 @@ h1, h2, h3 { margin: 0; }
 .qr svg { display: block; width: 100%; height: 100%; }
 
 .regreso { margin: 0; color: var(--texto-suave); font-size: 15px; }
+.boton-mismo-estilo { border-color: color-mix(in srgb, var(--secundario) 55%, var(--borde)); }
 
 /* ---------------------------------------------------------------- PIN y modales */
 
@@ -1283,6 +1522,7 @@ h1, h2, h3 { margin: 0; }
   .personalizar-cuerpo { grid-template-columns: 1fr; grid-template-rows: minmax(0, 0.9fr) minmax(0, 1fr); }
   .categorias { justify-content: flex-start; }
   .opciones-filtro { grid-template-columns: repeat(3, 1fr); }
+  .selector-filtros { min-height: 0; }
   .tarjeta-modo { aspect-ratio: auto; min-height: 22vh; }
 }
 
@@ -1366,11 +1606,26 @@ body.modo-web:not(.admin) #btn-ajustes { display: none; }
   .tarjeta-modo span:not(.icono) { align-self: start; text-align: left; font-size: 15px; }
 
   /* la lista de diseños empieza arriba (centrada se cortaba la primera fila) */
+  .explorador-plantillas { margin-bottom: 6px; }
+  .buscar-plantilla { min-height: 44px; padding: 0 11px; }
+  .boton-favoritos { min-height: 44px; width: 48px; padding: 0; font-size: 22px; }
+  .boton-favoritos span { display: none; }
   .opciones-plantilla { align-content: start; gap: 12px; padding: 4px; }
   .tarjeta-plantilla { padding: 12px 10px; gap: 8px; }
   .tarjeta-plantilla canvas { height: 150px; }
   .tarjeta-plantilla strong { font-size: 16px; text-align: center; overflow-wrap: anywhere; }
   .tarjeta-plantilla span { font-size: 13px; text-align: center; }
+  .tarjeta-plantilla .favorito-plantilla { width: 38px; height: 38px; top: 5px; right: 5px; font-size: 23px; }
+
+  /* selector de filtros compacto: cámara arriba, filtros deslizando abajo */
+  .filtro-cuerpo { grid-template-rows: minmax(180px, 1.15fr) minmax(0, 1fr); gap: 10px; }
+  .opciones-filtro { display: flex; gap: 9px; overflow: auto hidden; scroll-snap-type: x proximity; padding-bottom: 4px; }
+  .tarjeta-filtro { flex: 0 0 104px; scroll-snap-align: start; }
+  .categorias-filtro { margin-bottom: 4px; }
+  .intensidad-filtro { min-height: 46px; margin-top: 4px; padding: 5px 10px; font-size: 14px; }
+  .boton-comparar { min-height: 44px; padding: 0 12px; }
+  .controles-captura-pro { top: 8px; right: 8px; gap: 6px; }
+  .controles-captura-pro button { min-height: 40px; padding: 0 10px; font-size: 13px; }
 }
 
 /* ---------------------------------------------------------------- impresión */

@@ -7,28 +7,53 @@
  * el mismo filtro calculando los píxeles (ver `dibujarConFiltro`).
  */
 export const FILTROS = [
-  { id: 'normal', nombre: 'Natural', css: 'none' },
-  { id: 'bn', nombre: 'Blanco y negro', css: 'grayscale(1) contrast(1.1)' },
-  { id: 'glamour', nombre: 'Glamour', css: 'grayscale(1) contrast(1.35) brightness(1.08)' },
-  { id: 'sepia', nombre: 'Sepia', css: 'sepia(0.85) contrast(1.05) brightness(1.03)' },
-  { id: 'vintage', nombre: 'Vintage', css: 'sepia(0.35) saturate(1.25) contrast(1.08) hue-rotate(-8deg) brightness(1.02)' },
-  { id: 'calido', nombre: 'Cálido', css: 'sepia(0.22) saturate(1.3) brightness(1.05)' },
-  { id: 'frio', nombre: 'Frío', css: 'saturate(0.9) hue-rotate(12deg) brightness(1.05) contrast(1.05)' },
-  { id: 'vivido', nombre: 'Vívido', css: 'saturate(1.6) contrast(1.12)' },
-  { id: 'belleza', nombre: 'Piel suave', css: 'brightness(1.08) contrast(0.92) saturate(1.12) blur(0.4px)' },
-  { id: 'rosa', nombre: 'Romántico', css: 'sepia(0.2) saturate(1.35) hue-rotate(-14deg) brightness(1.07) contrast(0.95)' },
-  { id: 'dorado', nombre: 'Dorado', css: 'sepia(0.45) saturate(1.5) brightness(1.05) contrast(1.06)' },
-  { id: 'noche', nombre: 'Noche de terror', css: 'grayscale(0.35) sepia(0.3) hue-rotate(185deg) saturate(1.5) contrast(1.28) brightness(0.9)' },
-  { id: 'nieve', nombre: 'Invierno', css: 'sepia(0.15) hue-rotate(170deg) saturate(0.85) brightness(1.12) contrast(1.02)' },
-  { id: 'retro', nombre: 'Retro 70s', css: 'sepia(0.4) saturate(1.6) hue-rotate(-15deg) contrast(0.9) brightness(1.08)' },
-  { id: 'cine', nombre: 'Cine', css: 'contrast(1.2) saturate(1.1) sepia(0.12) brightness(0.96)' },
-  { id: 'pastel', nombre: 'Pastel', css: 'saturate(0.7) brightness(1.15) contrast(0.85)' },
-  { id: 'neon', nombre: 'Neón', css: 'saturate(2) contrast(1.2) hue-rotate(-20deg)' },
-  { id: 'dramatico', nombre: 'Dramático', css: 'grayscale(0.25) contrast(1.45) brightness(0.95)' },
+  { id: 'normal', nombre: 'Natural', categoria: 'Esenciales', css: 'none' },
+  { id: 'bn', nombre: 'Blanco y negro', categoria: 'Clásicos', css: 'grayscale(1) contrast(1.1)' },
+  { id: 'glamour', nombre: 'Glamour', categoria: 'Retrato', css: 'grayscale(1) contrast(1.35) brightness(1.08)' },
+  { id: 'sepia', nombre: 'Sepia', categoria: 'Clásicos', css: 'sepia(0.85) contrast(1.05) brightness(1.03)' },
+  { id: 'vintage', nombre: 'Vintage', categoria: 'Clásicos', css: 'sepia(0.35) saturate(1.25) contrast(1.08) hue-rotate(-8deg) brightness(1.02)' },
+  { id: 'calido', nombre: 'Cálido', categoria: 'Esenciales', css: 'sepia(0.22) saturate(1.3) brightness(1.05)' },
+  { id: 'frio', nombre: 'Frío', categoria: 'Esenciales', css: 'saturate(0.9) hue-rotate(12deg) brightness(1.05) contrast(1.05)' },
+  { id: 'vivido', nombre: 'Vívido', categoria: 'Esenciales', css: 'saturate(1.6) contrast(1.12)' },
+  { id: 'belleza', nombre: 'Piel suave', categoria: 'Retrato', css: 'brightness(1.08) contrast(0.92) saturate(1.12) blur(0.4px)' },
+  { id: 'rosa', nombre: 'Romántico', categoria: 'Retrato', css: 'sepia(0.2) saturate(1.35) hue-rotate(-14deg) brightness(1.07) contrast(0.95)' },
+  { id: 'dorado', nombre: 'Dorado', categoria: 'Fiesta', css: 'sepia(0.45) saturate(1.5) brightness(1.05) contrast(1.06)' },
+  { id: 'noche', nombre: 'Noche de terror', categoria: 'Creativos', css: 'grayscale(0.35) sepia(0.3) hue-rotate(185deg) saturate(1.5) contrast(1.28) brightness(0.9)' },
+  { id: 'nieve', nombre: 'Invierno', categoria: 'Creativos', css: 'sepia(0.15) hue-rotate(170deg) saturate(0.85) brightness(1.12) contrast(1.02)' },
+  { id: 'retro', nombre: 'Retro 70s', categoria: 'Clásicos', css: 'sepia(0.4) saturate(1.6) hue-rotate(-15deg) contrast(0.9) brightness(1.08)' },
+  { id: 'cine', nombre: 'Cine', categoria: 'Profesionales', css: 'contrast(1.2) saturate(1.1) sepia(0.12) brightness(0.96)' },
+  { id: 'pastel', nombre: 'Pastel', categoria: 'Retrato', css: 'saturate(0.7) brightness(1.15) contrast(0.85)' },
+  { id: 'neon', nombre: 'Neón', categoria: 'Fiesta', css: 'saturate(2) contrast(1.2) hue-rotate(-20deg)' },
+  { id: 'dramatico', nombre: 'Dramático', categoria: 'Profesionales', css: 'grayscale(0.25) contrast(1.45) brightness(0.95)' },
+  { id: 'mate', nombre: 'Mate editorial', categoria: 'Profesionales', css: 'saturate(0.82) contrast(0.9) brightness(1.06) sepia(0.08)' },
+  { id: 'editorial', nombre: 'Editorial', categoria: 'Profesionales', css: 'contrast(1.28) saturate(0.92) brightness(1.02)' },
+  { id: 'piel', nombre: 'Retrato natural', categoria: 'Retrato', css: 'brightness(1.06) contrast(0.96) saturate(1.06)' },
+  { id: 'caramelo', nombre: 'Caramelo', categoria: 'Fiesta', css: 'sepia(0.18) saturate(1.55) hue-rotate(-7deg) brightness(1.08)' },
+  { id: 'turquesa', nombre: 'Turquesa', categoria: 'Creativos', css: 'saturate(1.35) hue-rotate(18deg) contrast(1.08)' },
+  { id: 'lavanda', nombre: 'Lavanda', categoria: 'Creativos', css: 'sepia(0.1) saturate(1.18) hue-rotate(24deg) brightness(1.08)' },
+  { id: 'alto-contraste', nombre: 'Alto contraste', categoria: 'Profesionales', css: 'grayscale(1) contrast(1.7) brightness(1.02)' },
+  { id: 'festival', nombre: 'Festival', categoria: 'Fiesta', css: 'saturate(1.85) contrast(1.18) hue-rotate(-8deg) brightness(1.03)' },
 ];
 
 export function filtroPorId(id) {
   return FILTROS.find((f) => f.id === id) || FILTROS[0];
+}
+
+/**
+ * Mezcla un filtro con la imagen natural. En 0% todas las funciones vuelven a
+ * su valor neutro; en 100% se conserva el filtro original. Esto permite que
+ * el control de intensidad se vea igual en CSS y en el lienzo final.
+ */
+export function cssConIntensidad(css, intensidad = 1) {
+  const t = Math.max(0, Math.min(1, Number(intensidad) || 0));
+  if (!css || css === 'none' || t === 0) return 'none';
+  if (t === 1) return css;
+  return String(css).replace(/([a-z-]+)\(\s*([-\d.]+)(%|deg|px)?\s*\)/g, (_todo, nombre, valor, unidad = '') => {
+    const numero = Number(valor);
+    const neutro = ['brightness', 'contrast', 'saturate'].includes(nombre) ? 1 : 0;
+    const mezclado = neutro + (numero - neutro) * t;
+    return `${nombre}(${Math.round(mezclado * 1000) / 1000}${unidad})`;
+  });
 }
 
 // ------------------------------------------------------------------ filtro en el lienzo

@@ -103,8 +103,15 @@ export const PLANTILLAS = [
  * El id no cambia con el formato, así "tema-amor" sigue activo en los ajustes
  * aunque el invitado lo cambie de tira a una sola foto.
  */
+/** Formatos que admite un tema (la portada de revista sólo tiene el suyo). */
+export function formatosDeTema(tema) {
+  return Object.keys(FORMATOS_TEMA).filter((id) => (tema.formatos
+    ? tema.formatos.includes(id)
+    : !FORMATOS_TEMA[id].soloTema));
+}
+
 export function plantillaTema(tema, formatoId = tema.formato) {
-  const idFormato = FORMATOS_TEMA[formatoId] ? formatoId : tema.formato;
+  const idFormato = formatosDeTema(tema).includes(formatoId) ? formatoId : tema.formato;
   const f = FORMATOS_TEMA[idFormato];
   return {
     id: `tema-${tema.id}`,
@@ -419,7 +426,8 @@ function estiloPieTema(config, recursos, tema, paleta, personal) {
   const logo = personal?.logo || (oscuro && recursos.logoClaro) || recursos.logo;
   let sombra = oscuro ? { color: 'rgba(0,0,0,0.4)', blur: 10 } : null;
   if (tema.brilloTexto) sombra = { color: paleta.a, blur: 26 };
-  return { lineas, logo, logoPeso: personal?.logo ? 0.4 : 0.26, sombra };
+  // margenLateral: deja libres las esquinas de abajo, donde van los adornos del tema
+  return { lineas, logo, logoPeso: personal?.logo ? 0.4 : 0.26, sombra, margenLateral: 0.1 };
 }
 
 /**
@@ -455,6 +463,10 @@ function dibujarPie(ctx, caja, estilo) {
   }
 
   if (!hayTexto) return;
+  if (estilo.margenLateral) {
+    const m = caja.w * estilo.margenLateral;
+    areaTexto = { ...areaTexto, x: Math.max(areaTexto.x, caja.x + m), w: Math.min(areaTexto.w, caja.w - m * 2) };
+  }
 
   const pesoTotal = lineas.reduce((s, l) => s + l.peso, 0);
   const alturaBase = (areaTexto.h * 0.8) / (pesoTotal * 1.25);
@@ -553,7 +565,9 @@ export function componer(lienzo, plantilla, fotos, { config, recursos = {}, esca
   u.scale(escala, escala);
   u.imageSmoothingQuality = 'high';
 
-  if (tema) {
+  if (tema?.portada) {
+    componerPortada(u, anchoUnidad, plantilla.alto, fotos[0] || null, tema, paleta, configFinal, recursos, personal);
+  } else if (tema) {
     dibujarFondoTema(u, anchoUnidad, plantilla.alto, tema, paleta);
     dibujarEsquinas(u, anchoUnidad, plantilla.alto, tema, paleta, false);
     plantilla.ranuras.forEach((r, i) => {
@@ -591,6 +605,7 @@ export function configConColores(config, paleta) {
 
 /** Foto de una plantilla temática: marco del color del tema (sólido, doble línea o neón). */
 function dibujarFotoTema(ctx, foto, r, tema, paleta) {
+  if (r.polaroid) return dibujarPolaroid(ctx, foto, r);
   const lado = Math.min(r.w, r.h);
   const radio = lado * 0.035;
   const borde = Math.max(6, Math.round(lado * 0.03));
@@ -636,6 +651,157 @@ function dibujarFotoTema(ctx, foto, r, tema, paleta) {
     }
   }
   ctx.restore();
+}
+
+/** Foto instantánea: marco blanco con el borde de abajo más ancho, un poco inclinada. */
+function dibujarPolaroid(ctx, foto, r) {
+  const margen = r.w * 0.05;
+  const abajo = r.w * 0.17;
+  ctx.save();
+  ctx.translate(r.x + r.w / 2, r.y + r.h / 2);
+  ctx.rotate(((r.rot || 0) * Math.PI) / 180);
+  ctx.shadowColor = 'rgba(0,0,0,0.35)';
+  ctx.shadowBlur = margen * 1.6;
+  ctx.shadowOffsetY = margen * 0.45;
+  ctx.fillStyle = '#fdfdfb';
+  ctx.fillRect(-r.w / 2 - margen, -r.h / 2 - margen, r.w + margen * 2, r.h + margen + abajo);
+  ctx.shadowColor = 'transparent';
+  ctx.beginPath();
+  ctx.rect(-r.w / 2, -r.h / 2, r.w, r.h);
+  ctx.clip();
+  if (foto) dibujarCubriendo(ctx, foto, -r.w / 2, -r.h / 2, r.w, r.h);
+  else {
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(-r.w / 2, -r.h / 2, r.w, r.h);
+  }
+  ctx.restore();
+}
+
+/** Parte un texto en renglones que quepan en `ancho` (con la fuente actual), hasta `maximo`. */
+function partirEnRenglones(ctx, texto, ancho, maximo) {
+  const palabras = texto.split(/\s+/).filter(Boolean);
+  const renglones = [];
+  let actual = '';
+  for (const palabra of palabras) {
+    const prueba = actual ? `${actual} ${palabra}` : palabra;
+    if (ctx.measureText(prueba).width <= ancho || !actual) actual = prueba;
+    else {
+      renglones.push(actual);
+      actual = palabra;
+    }
+  }
+  if (actual) renglones.push(actual);
+  // si sobran renglones, el último junta el resto (luego se achica para que quepa)
+  return renglones.length > maximo
+    ? [...renglones.slice(0, maximo - 1), renglones.slice(maximo - 1).join(' ')]
+    : renglones;
+}
+
+const FUENTE_REVISTA = (px) => `900 ${px}px "Didot", "Bodoni MT", "Bodoni 72", "Playfair Display", Georgia, serif`;
+const FUENTE_TITULARES = (px) => `800 ${px}px "Segoe UI", "Helvetica Neue", Arial, sans-serif`;
+
+/**
+ * Portada de revista: la foto ocupa todo, arriba el nombre de la revista (el
+ * texto del invitado o el del tema), titulares a la izquierda y código de barras.
+ */
+function componerPortada(ctx, w, h, foto, tema, paleta, config, recursos, personal) {
+  if (foto) dibujarCubriendo(ctx, foto, 0, 0, w, h, 0.3);
+  else {
+    ctx.fillStyle = '#555555';
+    ctx.fillRect(0, 0, w, h);
+  }
+  // sombras arriba y abajo para que el texto se lea sobre cualquier foto
+  for (const [y0, y1, alfa] of [[0, h * 0.3, 0.55], [h, h * 0.55, 0.7]]) {
+    const g = ctx.createLinearGradient(0, y0, 0, y1);
+    g.addColorStop(0, `rgba(0,0,0,${alfa})`);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, Math.min(y0, y1), w, Math.abs(y1 - y0));
+  }
+
+  const margen = w * 0.05;
+  ctx.save();
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(0,0,0,0.35)';
+  ctx.shadowBlur = w * 0.01;
+
+  // cabecera
+  const titulo = (String(personal?.texto || '').trim() || tema.titulo).toUpperCase();
+  const px = ajustarTexto(ctx, titulo, FUENTE_REVISTA, h * 0.16, w - margen * 2);
+  ctx.font = FUENTE_REVISTA(px);
+  ctx.fillStyle = paleta.a;
+  ctx.textAlign = 'center';
+  const yTitulo = margen * 0.6 + px * 0.82;
+  ctx.fillText(titulo, w / 2, yTitulo);
+
+  // línea de edición
+  const chico = w * 0.024;
+  ctx.font = FUENTE_TITULARES(chico);
+  ctx.fillStyle = paleta.b;
+  ctx.textAlign = 'left';
+  ctx.fillText(`EDICIÓN ESPECIAL · ${fechaEvento(config).toUpperCase()}`, margen, yTitulo + chico * 1.8);
+  ctx.textAlign = 'right';
+  ctx.fillText(String(config.marca.nombre || '').toUpperCase(), w - margen, yTitulo + chico * 1.8);
+
+  // titulares (el nombre del evento, si lo hay, va primero y grande)
+  const evento = nombreDelEvento(config);
+  const titulares = [...tema.titulares];
+  if (evento) titulares[0] = evento;
+  ctx.textAlign = 'left';
+  let y = h * 0.64;
+  // titular principal: grande y en dos renglones si hace falta
+  const principal = String(titulares[0]).toUpperCase();
+  const pxP = w * 0.075;
+  ctx.font = FUENTE_TITULARES(pxP);
+  const renglones = partirEnRenglones(ctx, principal, w - margen * 2, 2);
+  const pxFinal = Math.min(pxP, ...renglones.map((r) => ajustarTexto(ctx, r, FUENTE_TITULARES, pxP, w - margen * 2)));
+  ctx.font = FUENTE_TITULARES(pxFinal);
+  ctx.fillStyle = paleta.a;
+  for (const renglon of renglones) {
+    ctx.fillText(renglon, margen, y);
+    y += pxFinal * 1.08;
+  }
+  y += pxFinal * 0.45;
+  // titulares secundarios con una rayita del color de la portada
+  for (const texto of titulares.slice(1)) {
+    const pxT = ajustarTexto(ctx, texto.toUpperCase(), FUENTE_TITULARES, w * 0.036, w * 0.62);
+    ctx.fillStyle = paleta.a;
+    ctx.fillRect(margen, y - pxT * 0.78, w * 0.012, pxT * 0.9);
+    ctx.font = FUENTE_TITULARES(pxT);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(texto.toUpperCase(), margen + w * 0.03, y);
+    y += pxT * 1.55;
+  }
+  ctx.restore();
+
+  // logo (el del invitado o el de la cabina) abajo a la izquierda
+  const logo = personal?.logo || recursos.logoClaro || recursos.logo;
+  if (logo) {
+    const proporcion = (logo.naturalWidth || logo.width) / (logo.naturalHeight || logo.height);
+    const lh = h * 0.07;
+    const lw = Math.min(w * 0.3, lh * proporcion);
+    ctx.drawImage(logo, margen, h - margen - lw / proporcion, lw, lw / proporcion);
+  }
+
+  // código de barras (de adorno)
+  const bw = w * 0.2;
+  const bh = h * 0.06;
+  const bx = w - margen - bw;
+  const by = h - margen - bh;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(bx - bw * 0.06, by - bh * 0.1, bw * 1.12, bh * 1.35);
+  ctx.fillStyle = '#111111';
+  let x = bx;
+  let n = 7;
+  while (x < bx + bw) {
+    n = (n * 1103515245 + 12345) % 2147483648;
+    const grosor = bw * (0.008 + (n % 5) * 0.006);
+    if (n % 3) ctx.fillRect(x, by, grosor, bh);
+    x += grosor + bw * 0.012;
+  }
+  ctx.font = FUENTE_TITULARES(bh * 0.18);
+  ctx.textAlign = 'center';
+  ctx.fillText(`${new Date().getFullYear()} · N.º 1`, bx + bw / 2, by + bh * 1.18);
 }
 
 /**

@@ -42,6 +42,7 @@
         </button>
         <!-- celular: mandar el enlace de la cabina a los amigos -->
         <button class="boton-enlace" id="btn-invitar" data-texto="inicioInvitar" hidden>📲 Compártela con tus amigos</button>
+        <button class="boton-enlace" id="btn-mis-fotos" hidden>🖼️ <span data-texto="inicioMisFotos">Mis fotos</span> <span class="contador" id="mis-fotos-cantidad"></span></button>
       </div>
       <div class="inicio-recientes" id="recientes" aria-hidden="true"></div>
     </div>
@@ -93,8 +94,16 @@
       <button class="boton-volver" data-accion="atras" aria-label="Volver">‹</button>
       <h2 data-texto="plantillaTitulo">Elige tu diseño</h2>
     </header>
+    <div class="explorador-plantillas" id="explorador-plantillas">
+      <label class="buscar-plantilla">
+        <span aria-hidden="true">⌕</span>
+        <input id="buscar-plantilla" type="search" placeholder="Buscar tema o diseño" autocomplete="off" enterkeyhint="search" aria-label="Buscar tema o diseño">
+      </label>
+      <button class="boton-favoritos" id="btn-solo-favoritos" type="button" aria-pressed="false" title="Mostrar mis favoritos">☆ <span>Favoritos</span></button>
+    </div>
     <!-- Todas · Clásicas · Amor · Navidad… (sólo si hay de varias) -->
     <div class="chips categorias" id="categorias-plantilla" hidden></div>
+    <p class="sin-resultados" id="plantillas-sin-resultados" hidden>No encontramos diseños con esa búsqueda.</p>
     <div class="opciones-plantilla" id="opciones-plantilla"></div>
   </section>
 
@@ -154,11 +163,30 @@
     <div class="filtro-cuerpo">
       <div class="filtro-principal">
         <video class="video-vivo espejo" id="video-filtro" muted playsinline autoplay></video>
+        <span class="etiqueta-comparacion" id="etiqueta-comparacion" hidden>Sin filtro</span>
+        <div class="controles-captura-pro" aria-label="Controles rápidos">
+          <button id="btn-flash-rapido" type="button" aria-pressed="true"><span aria-hidden="true">⚡</span><span class="control-pro-texto">Flash</span></button>
+          <button id="btn-temporizador-rapido" type="button" aria-label="Cambiar temporizador"><span aria-hidden="true">⏱</span><span id="temporizador-rapido-valor">5 s</span></button>
+          <button id="btn-zoom-rapido" type="button" aria-label="Cambiar el zoom"><span aria-hidden="true">🔍</span><span id="zoom-rapido-valor">1x</span></button>
+          <button id="btn-cuadricula" type="button" aria-pressed="false" aria-label="Guía de encuadre"><span aria-hidden="true">▦</span><span class="control-pro-texto">Guía</span></button>
+          <button id="btn-aplauso" type="button" aria-pressed="false" aria-label="Empezar con un aplauso"><span aria-hidden="true">👏</span><span class="control-pro-texto">Aplauso</span></button>
+        </div>
+        <div class="guia-encuadre" aria-hidden="true"></div>
+        <p class="aviso-aplauso" id="aviso-aplauso" data-texto="filtroAplausoAviso" hidden>👂 Aplaude o grita «¡whisky!» para empezar</p>
         <button class="boton-voltear" id="btn-voltear" type="button" aria-label="Cambiar de cámara" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3 7.2 5H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.2L15 3H9zm3 4.5a5 5 0 0 1 4.6 3H18l-2.5 3-2.5-3h1.4a3 3 0 0 0-5.3-.6L7.8 8.8A5 5 0 0 1 12 7.5zm-3.5 3.5 2.5 3H9.6a3 3 0 0 0 5.3.6l1.3 1.1A5 5 0 0 1 7.4 14H6l2.5-3z"/></svg>
         </button>
+        <button class="boton-comparar" id="btn-comparar-filtro" type="button" aria-label="Mantén presionado para ver la foto sin filtro">◐ <span>Antes</span></button>
       </div>
-      <div class="opciones-filtro" id="opciones-filtro"></div>
+      <div class="selector-filtros">
+        <div class="chips categorias-filtro" id="categorias-filtro"></div>
+        <div class="opciones-filtro" id="opciones-filtro"></div>
+        <label class="intensidad-filtro" id="control-intensidad">
+          <span>Intensidad</span>
+          <input id="intensidad-filtro" type="range" min="0" max="100" value="100" step="5">
+          <output id="valor-intensidad">100%</output>
+        </label>
+      </div>
     </div>
     <div class="barra-acciones">
       <!-- celular: poner en el diseño fotos que ya están en el teléfono -->
@@ -171,6 +199,7 @@
   <!-- ============================================================ CAPTURA -->
   <section class="pantalla pantalla-captura" id="p-captura" data-pantalla="captura">
     <video class="video-vivo espejo" id="video-principal" muted playsinline autoplay></video>
+    <div class="guia-encuadre" aria-hidden="true"></div>
     <div class="captura-indicador" id="captura-indicador"></div>
     <div class="cuenta" id="cuenta" aria-live="assertive"></div>
     <div class="mensaje-grande" id="mensaje-captura"></div>
@@ -256,10 +285,12 @@
         <a class="boton-gigante" id="btn-descargar" data-texto="finalDescargar" download hidden>Guardar en mi celular</a>
         <button class="boton-secundario grande" id="btn-compartir" data-texto="finalCompartir" hidden>Compartir</button>
         <button class="boton-enlace" id="btn-fotos-sueltas" data-texto="finalFotosSueltas" hidden>Guardar también las fotos sueltas</button>
+        <button class="boton-enlace" id="btn-imprimir-celular" data-texto="finalImprimirCelular" hidden>🖨️ Imprimir</button>
         <div class="bloque-qr" id="bloque-qr">
           <div class="qr" id="qr"></div>
           <p><span data-texto="finalQr">Escanea con tu celular para descargar</span><br><small data-texto="finalQrAyuda">(conéctate al Wi-Fi del evento)</small></p>
         </div>
+        <button class="boton-secundario grande boton-mismo-estilo" id="btn-mismo-estilo" data-texto="finalMismoEstilo">📸 Otra con el mismo estilo</button>
         <button class="boton-secundario grande" id="btn-terminar" data-texto="finalTerminar">Terminar</button>
         <p class="regreso" id="regreso"></p>
       </aside>
@@ -289,6 +320,27 @@
       <div class="ajustes-cuerpo">
         <nav class="ajustes-pestanas" id="ajustes-pestanas"></nav>
         <div class="ajustes-contenido" id="ajustes-contenido"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ MIS FOTOS (celular) -->
+  <div class="mis-fotos" id="mis-fotos" hidden>
+    <div class="mis-fotos-caja">
+      <header class="mis-fotos-encabezado">
+        <h2 data-texto="misFotosTitulo">Mis fotos</h2>
+        <button class="boton-secundario" id="btn-mis-fotos-cerrar" data-texto="misFotosCerrar">Cerrar</button>
+      </header>
+      <p class="nota-chica" data-texto="misFotosAyuda">Tus últimas creaciones quedan guardadas en este celular. Toca una para guardarla o compartirla.</p>
+      <div class="mis-fotos-cuadricula" id="mis-fotos-cuadricula"></div>
+      <div class="mis-fotos-visor" id="mis-fotos-visor" hidden>
+        <div class="mis-fotos-medio" id="mis-fotos-medio"></div>
+        <div class="mis-fotos-acciones">
+          <button class="boton-gigante" id="btn-mis-fotos-guardar" data-texto="finalDescargar">Guardar en mi celular</button>
+          <button class="boton-secundario grande" id="btn-mis-fotos-compartir" data-texto="finalCompartir">Compartir</button>
+          <button class="boton-secundario" id="btn-mis-fotos-borrar" data-texto="misFotosBorrar">🗑 Borrar</button>
+          <button class="boton-secundario" id="btn-mis-fotos-volver" data-texto="misFotosVolver">‹ Volver</button>
+        </div>
       </div>
     </div>
   </div>
