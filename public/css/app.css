@@ -1350,6 +1350,12 @@ body.con-cuadricula .guia-encuadre { display: block; }
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 .campo > label { font-weight: 600; }
+.campo > span { font-weight: 600; }
+.campo .campo-texto { max-width: 460px; min-height: 44px; font-size: 16px; }
+.ayuda-token { margin: 8px 0 12px; padding: 10px 14px; border-radius: 12px; background: var(--superficie); }
+.ayuda-token summary { cursor: pointer; font-weight: 700; }
+.ayuda-token ol { margin: 10px 0 0; padding-left: 20px; line-height: 1.5; color: var(--texto-suave); }
+@media (max-width: 600px) { .campo { grid-template-columns: 1fr; } }
 .campo .ayuda { grid-column: 2; margin: 0; color: var(--texto-suave); font-size: 13px; }
 
 .campo input[type="text"], .campo input[type="number"], .campo input[type="date"], .campo select, .campo textarea {

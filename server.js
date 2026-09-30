@@ -492,6 +492,19 @@ function configParaCelular(config, { disenos, plantillasBasicas }) {
   c.general = { ...c.general, pin: CONFIG_BASE.general.pin, carpetaRespaldo: '' };
   c.compartir = structuredClone(CONFIG_BASE.compartir);
   c.compartir.qr = false;
+  // galería del evento: los celulares suben a la misma cuenta y con la misma etiqueta que
+  // la cabina. El cloud name y el preset sin firmar son públicos por naturaleza (no hay clave).
+  if (nubeLista(config)) {
+    const n = config.compartir.nube;
+    Object.assign(c.compartir.nube, {
+      activo: true,
+      cloudName: n.cloudName,
+      preset: n.preset,
+      urlGaleria: n.urlGaleria,
+      galeriaCelulares: n.galeriaCelulares !== false,
+      etiquetaEvento: etiquetaEvento(slug(config.evento.nombre)),
+    });
+  }
   c.captura.camaraId = '';
   c.formulario.activo = false;
   c.pantallaVerde = { ...c.pantallaVerde, activo: false, fondos: [] }; // en casa no hay tela verde

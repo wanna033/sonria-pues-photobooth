@@ -7,7 +7,7 @@
  * Sólo se registra en la versión web (en la cabina de la PC no hace falta).
  */
 
-const CACHE = 'sonria-pues-v5';
+const CACHE = 'sonria-pues-v6';
 const ESPERA_MS = 3500;
 
 const BASICOS = [
@@ -30,6 +30,7 @@ const BASICOS = [
   'js/gif-trabajador.js',
   'js/nube.js',
   'js/plantillas.js',
+  'js/publicar.js',
   'js/qr.js',
   'js/sonidos.js',
   'js/stickers.js',

@@ -8,6 +8,7 @@ import { FILTROS } from './filtros.js';
 import { qrSvg } from './qr.js';
 import { GRUPOS_TEXTOS } from './textos.js';
 import { EditorDisenos } from './disenos.js';
+import { leerAcceso, guardarAcceso, olvidarAcceso, publicarEnGitHub, REPO_PREDETERMINADO } from './publicar.js';
 
 const SECCIONES = [
   { id: 'estado', titulo: 'Estado', especial: 'estado' },
@@ -160,6 +161,7 @@ const SECCIONES = [
       { ruta: 'compartir.nube.preset', tipo: 'texto', etiqueta: 'Upload preset (Unsigned)', ayuda: 'El nombre del preset sin firmar que creaste en Cloudinary.' },
       { ruta: 'compartir.nube.urlGaleria', tipo: 'texto', etiqueta: 'Dirección de tu página de descarga', ayuda: 'Tu página en GitHub, por ejemplo https://wanna033.github.io/sonria-pues-photobooth/g. Si la dejas vacía, el QR abre la foto directamente.' },
       { ruta: 'compartir.nube.subirFotosSueltas', tipo: 'bool', etiqueta: 'Subir también las fotos individuales', ayuda: 'Apagado sube sólo la tira, el GIF y el video: más rápido y códigos QR más sencillos.' },
+      { ruta: 'compartir.nube.galeriaCelulares', tipo: 'bool', etiqueta: 'Galería del evento desde los celulares', ayuda: 'Los invitados que usan la cabina en su celular pueden tocar «Subir a la galería del evento» y su foto aparece junto a las de la cabina. Sólo se sube si el invitado lo toca. Para que la galería se vea, en Cloudinary activa Settings → Security → Resource list. Se publica en Ajustes → Celulares.' },
       { tipo: 'probar-nube' },
       { h: 'Con las fotos guardadas en internet' },
       { ruta: 'impresion.qrEnImpresion', tipo: 'bool', etiqueta: 'Imprimir el código QR en la foto', ayuda: 'Cada tira o postal lleva un QR pequeño (unos 2 cm) para descargar las fotos cuando quieran, incluso días después. Sólo funciona con "Guardar cada sesión en internet".' },
@@ -621,10 +623,7 @@ export class Ajustes {
       el('h3', {}, 'La cabina en el celular de tus invitados'),
       el('p', { class: 'nota' }, 'Cualquier persona abre este enlace en su celular (Android o iPhone), elige un diseño, se toma las fotos con su propia cámara y las guarda en su galería. No tiene que instalar nada.'),
     );
-    if (this.modoWeb) {
-      c.append(el('p', { class: 'nota' }, 'Los diseños para los celulares se publican desde la cabina de la computadora.'));
-      return;
-    }
+    if (this.modoWeb) return this.mostrarCelularEnLinea(c);
 
     const qr = el('div', { class: 'celular-qr' });
     qr.innerHTML = qrSvg(url, { nivel: 'M', margen: 2 });
@@ -695,6 +694,91 @@ export class Ajustes {
       publicar.disabled = false;
     });
     c.append(el('div', { class: 'fila-botones' }, publicar), estado);
+  }
+
+  /**
+   * Panel en línea (la cabina abierta en el navegador con ?ajustes): publica
+   * los ajustes y los diseños para todos los celulares directo en GitHub,
+   * sin la computadora. El token se guarda sólo en este dispositivo.
+   */
+  async mostrarCelularEnLinea(c) {
+    const acceso = leerAcceso();
+    const campoToken = el('input', { class: 'campo-texto', type: 'password', autocomplete: 'off', placeholder: 'github_pat_…', value: acceso.token });
+    const campoRepo = el('input', { class: 'campo-texto', type: 'text', autocomplete: 'off', value: acceso.repo });
+    c.append(
+      el('h3', {}, 'Publicar para todos, desde aquí'),
+      el('p', { class: 'nota' }, 'Lo que cambies en estos ajustes (nombre del evento, colores, logotipo, plantillas, filtros, textos, nube) y los diseños que marques abajo se publican para todos los celulares, sin usar la computadora.'),
+      el('details', { class: 'ayuda-token' },
+        el('summary', {}, '¿Cómo consigo el token? (una sola vez)'),
+        el('ol', {},
+          el('li', {}, 'En GitHub entra a Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token.'),
+          el('li', {}, `En «Repository access» elige «Only select repositories» y marca ${REPO_PREDETERMINADO.split('/')[1]}.`),
+          el('li', {}, 'En «Permissions → Repository permissions» pon «Contents» en «Read and write». Nada más.'),
+          el('li', {}, 'Copia el token y pégalo aquí. Se guarda sólo en este dispositivo; no lo compartas con nadie.'))),
+      el('label', { class: 'campo' }, el('span', {}, 'Token de GitHub'), campoToken),
+      el('label', { class: 'campo' }, el('span', {}, 'Repositorio'), campoRepo),
+    );
+
+    const disenos = await this.api('/api/disenos').catch(() => []);
+    const elegidos = new Set(disenos.filter((d) => this.borrador.plantillas.habilitadas.includes(d.id)).map((d) => d.id));
+    c.append(el('h3', {}, 'Diseños que verán en el celular'));
+    if (!disenos.length) c.append(el('p', { class: 'nota' }, 'Todavía no hay diseños propios: súbelos en "Mis diseños".'));
+    const lista = el('div', { class: 'celular-disenos' });
+    for (const d of disenos) {
+      const check = el('input', { type: 'checkbox', checked: elegidos.has(d.id) });
+      check.addEventListener('change', () => (check.checked ? elegidos.add(d.id) : elegidos.delete(d.id)));
+      lista.append(el('label', { class: 'celular-diseno' },
+        check,
+        el('img', { src: d.url, alt: '', loading: 'lazy' }),
+        el('span', {}, el('strong', {}, d.nombre), el('small', {}, `${d.ranuras.length} ${d.ranuras.length === 1 ? 'foto' : 'fotos'}`))));
+    }
+    const basicas = el('input', { type: 'checkbox', checked: true });
+    lista.append(el('label', { class: 'celular-diseno' },
+      basicas,
+      el('span', {}, el('strong', {}, 'Plantillas básicas y temáticas'), el('small', {}, 'Las 37 de la cabina: clásicas, Amor, Navidad, Halloween…'))));
+    c.append(lista);
+
+    const estado = el('p', { class: 'nota' }, acceso.token ? 'Token guardado en este dispositivo.' : 'Pega tu token para poder publicar.');
+    const publicar = el('button', { class: 'boton-primario', type: 'button' }, '🌐 Publicar para todos');
+    const olvidar = el('button', { class: 'boton-secundario', type: 'button' }, 'Olvidar el token');
+    olvidar.addEventListener('click', () => {
+      olvidarAcceso();
+      campoToken.value = '';
+      estado.textContent = 'Token borrado de este dispositivo.';
+    });
+    publicar.addEventListener('click', async () => {
+      const nuevo = { token: campoToken.value.trim(), repo: campoRepo.value.trim() || REPO_PREDETERMINADO };
+      if (!nuevo.token) {
+        estado.textContent = '❌ Primero pega tu token de GitHub.';
+        return;
+      }
+      if (!elegidos.size && !basicas.checked) {
+        this.acciones.aviso?.('Elige al menos un diseño o las plantillas básicas');
+        return;
+      }
+      publicar.disabled = true;
+      estado.textContent = '⏳ Revisando el token…';
+      try {
+        guardarAcceso(nuevo);
+        // lo que se ve en el panel se guarda primero, aunque no se haya tocado "Guardar"
+        const guardada = await this.api('/api/config', { method: 'PUT', json: this.borrador });
+        await this.acciones.alActualizar?.(guardada);
+        const fabrica = await (await fetch('../config.default.json', { cache: 'no-cache' })).json();
+        const r = await publicarEnGitHub({
+          acceso: nuevo,
+          config: this.borrador,
+          fabrica,
+          disenos: disenos.filter((d) => elegidos.has(d.id)),
+          plantillasBasicas: basicas.checked,
+          alAvanzar: (texto) => { estado.textContent = `⏳ ${texto}`; },
+        });
+        estado.textContent = `✅ Publicado (${r.archivos} archivos). En 1 o 2 minutos aparece en todos los celulares; los que ya la tenían abierta, que recarguen.`;
+      } catch (err) {
+        estado.textContent = `❌ ${err.message}`;
+      }
+      publicar.disabled = false;
+    });
+    c.append(el('div', { class: 'fila-botones' }, publicar, olvidar), estado);
   }
 
   /** Guarda el QR del enlace como imagen PNG (para imprimirlo o mandarlo por WhatsApp). */

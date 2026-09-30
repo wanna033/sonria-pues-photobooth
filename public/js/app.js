@@ -19,8 +19,10 @@ import { configurarSonidos, pitido, obturador, exito, hablar } from './sonidos.j
 import { EditorStickers } from './stickers.js';
 import { Ajustes } from './ajustes.js';
 import { configurarTextos, pintarTextosFijos, t } from './textos.js';
-import { nubeActiva, subirSesion as subirSesionANube, probarNube } from './nube.js';
-import { detectarModoWeb, apiWeb } from './web.js';
+import {
+  nubeActiva, subirSesion as subirSesionANube, probarNube, galeriaDisponible, enlaceGaleriaEvento, subirALaGaleria,
+} from './nube.js';
+import { detectarModoWeb, apiWeb, ultimaSesion } from './web.js';
 import { DetectorAplauso } from './aplauso.js';
 import { listarRecuerdos, guardarRecuerdo, borrarRecuerdo } from './recuerdos.js';
 
@@ -204,6 +206,7 @@ async function aplicarConfig() {
 
   configurarSonidos({ sonidos: captura.sonidos, voz: captura.voz });
   document.querySelectorAll('.video-vivo').forEach((v) => v.classList.toggle('espejo', espejoVista()));
+  pintarEnlaceGaleria();
 }
 
 /** Carga los diseños propios ("Mis diseños") para usarlos como plantillas. */
@@ -1588,7 +1591,9 @@ async function compartirEnInternet(archivos, token) {
     return;
   }
 
-  // Versión web (sin servidor): se sube desde el navegador y se espera
+  // Versión web (sin servidor): el celular es del invitado, así que nada se sube
+  // solo. Si hay galería del evento, él decide en la pantalla final.
+  if (galeriaDisponible(estado.config)) return;
   const texto = t('procesandoSubiendo');
   try {
     progreso(texto, 0.05);
@@ -1786,6 +1791,46 @@ function otraConMismoEstilo() {
   iniciarCaptura();
 }
 
+// ================================================================ galería del evento (celular)
+
+/** Botón "Subir a la galería del evento": sólo si la cabina la activó y el invitado lo toca. */
+function prepararGaleria() {
+  const boton = $('#btn-subir-galeria');
+  const enlace = $('#enlace-galeria-final');
+  const disponible = MODO_WEB && galeriaDisponible(estado.config);
+  boton.hidden = !disponible;
+  boton.disabled = false;
+  boton.textContent = t('finalSubirGaleria');
+  enlace.hidden = true;
+  if (!disponible) return;
+  const archivos = [...ultimaSesion.archivos];
+  boton.onclick = async () => {
+    boton.disabled = true;
+    boton.textContent = t('finalSubiendoGaleria');
+    try {
+      const { galeria } = await subirALaGaleria(estado.config, archivos, (f) => {
+        boton.textContent = `${t('finalSubiendoGaleria')} ${Math.round(f * 100)}%`;
+      });
+      boton.textContent = t('finalEnGaleria');
+      enlace.href = galeria;
+      enlace.hidden = false;
+    } catch (err) {
+      console.error('No se pudo subir a la galería', err);
+      aviso(t('avisoGaleriaError'), 6000);
+      boton.disabled = false;
+      boton.textContent = t('finalSubirGaleria');
+    }
+  };
+}
+
+/** Enlace a la galería del evento en el inicio (celular). */
+function pintarEnlaceGaleria() {
+  const enlace = $('#enlace-galeria-inicio');
+  const url = MODO_WEB ? enlaceGaleriaEvento(estado.config) : '';
+  enlace.hidden = !url;
+  if (url) enlace.href = url;
+}
+
 // ================================================================ Mis fotos (celular)
 
 async function pintarBotonMisFotos() {
@@ -1909,6 +1954,8 @@ async function prepararGuardado(resultado) {
 
   const compartible = Boolean(archivo && navigator.canShare?.({ files: [archivo] }));
   botonCompartir.hidden = !compartible;
+
+  prepararGaleria();
 
   // imprimir en casa desde el celular (AirPrint o la impresora del teléfono), al tamaño del diseño
   const botonImprimir = $('#btn-imprimir-celular');

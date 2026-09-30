@@ -218,7 +218,9 @@
       "cloudName": "",
       "preset": "",
       "subirFotosSueltas": false,
-      "urlGaleria": "https://wanna033.github.io/sonria-pues-photobooth/g"
+      "urlGaleria": "https://wanna033.github.io/sonria-pues-photobooth/g",
+      "galeriaCelulares": true,
+      "etiquetaEvento": ""
     }
   },
   "formulario": {
